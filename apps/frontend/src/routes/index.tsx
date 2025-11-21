@@ -25,8 +25,8 @@ function LandingPage() {
 			</div>
 
 			<footer className="mt-16 text-xs text-muted-foreground text-center opacity-80">
-				&copy; {new Date().getFullYear()} Tibia Group Tools &mdash; Not
-				affiliated with CipSoft or Tibia.com
+				&copy; {new Date().getFullYear()} LootSheet &mdash; Not affiliated with
+				CipSoft or Tibia.com
 			</footer>
 		</div>
 	);

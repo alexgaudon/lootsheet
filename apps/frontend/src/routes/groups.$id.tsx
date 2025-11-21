@@ -326,7 +326,7 @@ function RouteComponent() {
 	};
 
 	return (
-		<div className="container mx-auto max-w-4xl px-4 py-8">
+		<div className="container mx-auto max-w-7xl px-4 py-8">
 			<Link to="/groups">
 				<Button variant="ghost" className="mb-6">
 					<ArrowLeft className="mr-2 h-4 w-4" />
@@ -334,328 +334,344 @@ function RouteComponent() {
 				</Button>
 			</Link>
 
-			<div className="space-y-6">
-				{/* Group Header */}
-				<div className="border rounded-lg p-6 bg-card">
-					<div className="flex items-start justify-between mb-4">
-						<div>
-							<h1 className="text-3xl font-bold mb-2">{group.name}</h1>
-							<p className="text-sm text-muted-foreground">
-								Created {new Date(group.created).toLocaleDateString()}
-							</p>
+			{/* Two Column Layout */}
+			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+				{/* Left Column: Group Info */}
+				<div className="lg:col-span-1 space-y-6">
+					{/* Group Header */}
+					<div className="border rounded-lg p-6 bg-card">
+						<div className="flex items-start justify-between mb-4">
+							<div>
+								<h1 className="text-3xl font-bold mb-2">{group.name}</h1>
+								<p className="text-sm text-muted-foreground">
+									Created {new Date(group.created).toLocaleDateString()}
+								</p>
+							</div>
+							<div className="flex items-center gap-2">
+								{isOwner && (
+									<span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
+										Owner
+									</span>
+								)}
+								{isOwner && (
+									<Button
+										variant="destructive"
+										size="sm"
+										onClick={() => setIsDeleteDialogOpen(true)}
+									>
+										<Trash2 className="h-4 w-4 mr-2" />
+										Delete Group
+									</Button>
+								)}
+							</div>
 						</div>
-						<div className="flex items-center gap-2">
-							{isOwner && (
-								<span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
-									Owner
-								</span>
-							)}
+					</div>
+
+					{/* Owner Section */}
+					<div className="border rounded-lg p-6 bg-card">
+						<h2 className="text-xl font-semibold mb-4">Owner</h2>
+						<div className="flex items-center gap-3">
+							<div className="flex-1">
+								<p className="font-medium">{ownerName}</p>
+							</div>
+						</div>
+					</div>
+
+					{/* Members Section */}
+					<div className="border rounded-lg p-6 bg-card">
+						<div className="flex items-center justify-between mb-4">
+							<h2 className="text-xl font-semibold">
+								Members ({members.length})
+							</h2>
 							{isOwner && (
 								<Button
-									variant="destructive"
 									size="sm"
-									onClick={() => setIsDeleteDialogOpen(true)}
+									onClick={() => {
+										setIsInviteDialogOpen(true);
+										createInvitationMutation.mutate();
+									}}
+									disabled={createInvitationMutation.isPending}
 								>
-									<Trash2 className="h-4 w-4 mr-2" />
-									Delete Group
+									Invite People
 								</Button>
 							)}
 						</div>
-					</div>
-				</div>
-
-				{/* Owner Section */}
-				<div className="border rounded-lg p-6 bg-card">
-					<h2 className="text-xl font-semibold mb-4">Owner</h2>
-					<div className="flex items-center gap-3">
-						<div className="flex-1">
-							<p className="font-medium">{ownerName}</p>
-						</div>
-					</div>
-				</div>
-
-				{/* Members Section */}
-				<div className="border rounded-lg p-6 bg-card">
-					<div className="flex items-center justify-between mb-4">
-						<h2 className="text-xl font-semibold">
-							Members ({members.length})
-						</h2>
-						{isOwner && (
-							<Button
-								onClick={() => {
-									setIsInviteDialogOpen(true);
-									createInvitationMutation.mutate();
-								}}
-								disabled={createInvitationMutation.isPending}
-							>
-								Invite People
-							</Button>
-						)}
-					</div>
-					{members.length === 0 ? (
-						<p className="text-muted-foreground">No members yet.</p>
-					) : (
-						<div className="space-y-3">
-							{members.map((member) => {
-								const memberName = member.name || member.username || "Unknown";
-								const isCurrentUser = member.id === auth.record?.id;
-								return (
-									<div
-										key={member.id}
-										className="flex items-center justify-between p-3 rounded-md bg-accent/50"
-									>
-										<div className="flex-1">
-											<p className="font-medium">
-												{memberName}
-												{isCurrentUser && (
-													<span className="ml-2 text-xs text-muted-foreground">
-														(You)
-													</span>
-												)}
-											</p>
-										</div>
-										{member.id === group.owner && (
-											<span className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">
-												Owner
-											</span>
-										)}
-									</div>
-								);
-							})}
-						</div>
-					)}
-				</div>
-
-				{/* Transfers Section */}
-				<div className="border rounded-lg p-6 bg-card">
-					<h2 className="text-xl font-semibold mb-4">
-						Transfers ({transfers?.length || 0})
-					</h2>
-					{transfers.length === 0 ? (
-						<p className="text-muted-foreground">
-							No transfers yet. Save a loot split session to create transfers.
-						</p>
-					) : (
-						<>
-							{(() => {
-								const formatNumber = (num: number): string => {
-									return num.toLocaleString("en-US");
-								};
-
-								const getStatusColor = (status: string) => {
-									switch (status) {
-										case "complete":
-											return "bg-green-500/10 text-green-600 dark:text-green-400";
-										case "sent":
-											return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
-										default:
-											return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400";
-									}
-								};
-
-								// Group transfers by from and to
-								const groupTransfers = (
-									transferList: TransfersResponse[],
-								): Map<string, TransfersResponse[]> => {
-									const groups = new Map<string, TransfersResponse[]>();
-									for (const transfer of transferList) {
-										const key = `${transfer.from}→${transfer.to}`;
-										if (!groups.has(key)) {
-											groups.set(key, []);
-										}
-										const group = groups.get(key);
-										if (group) {
-											group.push(transfer);
-										}
-									}
-									return groups;
-								};
-
-								const incompleteTransfers = transfers.filter(
-									(t) => t.status !== "complete",
-								);
-								const completedTransfers = transfers.filter(
-									(t) => t.status === "complete",
-								);
-
-								const incompleteGroups = groupTransfers(incompleteTransfers);
-								const completedGroups = groupTransfers(completedTransfers);
-
-								const renderTransfer = (transfer: TransfersResponse) => {
-									const isCopied = copiedTransferId === transfer.id;
+						{members.length === 0 ? (
+							<p className="text-muted-foreground">No members yet.</p>
+						) : (
+							<div className="space-y-3">
+								{members.map((member) => {
+									const memberName =
+										member.name || member.username || "Unknown";
+									const isCurrentUser = member.id === auth.record?.id;
 									return (
 										<div
-											key={transfer.id}
+											key={member.id}
 											className="flex items-center justify-between p-3 rounded-md bg-accent/50"
 										>
-											<div className="flex items-center gap-3 flex-1">
-												<div className="flex items-center gap-2">
-													<span className="font-semibold">{transfer.from}</span>
-													<span className="text-muted-foreground">→</span>
-													<span className="font-semibold">{transfer.to}</span>
-												</div>
-												<span className="font-semibold text-lg">
-													{formatNumber(transfer.amount || 0)} gp
-												</span>
-											</div>
-											<div className="flex items-center gap-2">
-												<span
-													className={`text-xs px-2 py-1 rounded capitalize ${getStatusColor(
-														transfer.status || "pending",
-													)}`}
-												>
-													{transfer.status || "pending"}
-												</span>
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={() => handleCopyTransfer(transfer)}
-													className="p-2"
-												>
-													{isCopied ? (
-														<Check className="h-4 w-4" />
-													) : (
-														<Copy className="h-4 w-4" />
+											<div className="flex-1">
+												<p className="font-medium">
+													{memberName}
+													{isCurrentUser && (
+														<span className="ml-2 text-xs text-muted-foreground">
+															(You)
+														</span>
 													)}
-												</Button>
-												{isMember &&
-													transfer.status !== "complete" &&
-													(transfer.status === "pending" ? (
-														<Button
-															size="sm"
-															variant="outline"
-															onClick={() =>
-																updateTransferStatusMutation.mutate({
-																	transferId: transfer.id,
-																	status: "sent",
-																})
-															}
-															disabled={updateTransferStatusMutation.isPending}
-														>
-															Mark as Sent
-														</Button>
-													) : (
-														<Button
-															size="sm"
-															variant="outline"
-															onClick={() =>
-																updateTransferStatusMutation.mutate({
-																	transferId: transfer.id,
-																	status: "complete",
-																})
-															}
-															disabled={updateTransferStatusMutation.isPending}
-														>
-															Mark as Complete
-														</Button>
-													))}
+												</p>
 											</div>
+											{member.id === group.owner && (
+												<span className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">
+													Owner
+												</span>
+											)}
 										</div>
 									);
-								};
+								})}
+							</div>
+						)}
+					</div>
+				</div>
 
-								const renderTransferGroup = (
-									groupKey: string,
-									groupTransfers: TransfersResponse[],
-									isCompleted: boolean,
-								) => {
-									if (groupTransfers.length === 1) {
-										return renderTransfer(groupTransfers[0]);
-									}
+				{/* Right Column: Transfers */}
+				<div className="lg:col-span-2">
+					<div className="border rounded-lg p-6 bg-card lg:sticky lg:top-24">
+						<div className="flex items-center justify-between mb-6">
+							<h2 className="text-2xl font-semibold">
+								Transfers ({transfers?.length || 0})
+							</h2>
+						</div>
+						{transfers.length === 0 ? (
+							<p className="text-muted-foreground">
+								No transfers yet. Save a loot split session to create transfers.
+							</p>
+						) : (
+							<>
+								{(() => {
+									const formatNumber = (num: number): string => {
+										return num.toLocaleString("en-US");
+									};
 
-									const totalAmount = groupTransfers.reduce(
-										(sum, t) => sum + (t.amount || 0),
-										0,
+									const getStatusColor = (status: string) => {
+										switch (status) {
+											case "complete":
+												return "bg-green-500/10 text-green-600 dark:text-green-400";
+											case "sent":
+												return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+											default:
+												return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400";
+										}
+									};
+
+									// Group transfers by from and to
+									const groupTransfers = (
+										transferList: TransfersResponse[],
+									): Map<string, TransfersResponse[]> => {
+										const groups = new Map<string, TransfersResponse[]>();
+										for (const transfer of transferList) {
+											const key = `${transfer.from}→${transfer.to}`;
+											if (!groups.has(key)) {
+												groups.set(key, []);
+											}
+											const group = groups.get(key);
+											if (group) {
+												group.push(transfer);
+											}
+										}
+										return groups;
+									};
+
+									const incompleteTransfers = transfers.filter(
+										(t) => t.status !== "complete",
 									);
-									const canCombine =
-										isMember &&
-										!isCompleted &&
-										groupTransfers.every((t) => t.status === "pending");
+									const completedTransfers = transfers.filter(
+										(t) => t.status === "complete",
+									);
 
-									return (
-										<div
-											key={groupKey}
-											className="space-y-2 border-l-2 border-primary/30 pl-3"
-										>
-											{groupTransfers.map((transfer) =>
-												renderTransfer(transfer),
-											)}
-											{canCombine && (
-												<div className="flex items-center justify-between p-2 bg-primary/5 rounded-md border border-primary/20">
+									const incompleteGroups = groupTransfers(incompleteTransfers);
+									const completedGroups = groupTransfers(completedTransfers);
+
+									const renderTransfer = (transfer: TransfersResponse) => {
+										const isCopied = copiedTransferId === transfer.id;
+										return (
+											<div
+												key={transfer.id}
+												className="flex items-center justify-between p-3 rounded-md bg-accent/50"
+											>
+												<div className="flex items-center gap-3 flex-1">
 													<div className="flex items-center gap-2">
-														<span className="text-sm text-muted-foreground">
-															{groupTransfers.length} transfers → Combined:{" "}
-															{formatNumber(totalAmount)} gp
+														<span className="font-semibold">
+															{transfer.from}
 														</span>
+														<span className="text-muted-foreground">→</span>
+														<span className="font-semibold">{transfer.to}</span>
 													</div>
+													<span className="font-semibold text-lg">
+														{formatNumber(transfer.amount || 0)} gp
+													</span>
+												</div>
+												<div className="flex items-center gap-2">
+													<span
+														className={`text-xs px-2 py-1 rounded capitalize ${getStatusColor(
+															transfer.status || "pending",
+														)}`}
+													>
+														{transfer.status || "pending"}
+													</span>
 													<Button
 														size="sm"
 														variant="outline"
-														onClick={() => {
-															combineTransfersMutation.mutate({
-																transferIds: groupTransfers.map((t) => t.id),
-																from: groupTransfers[0].from || "",
-																to: groupTransfers[0].to || "",
-																totalAmount,
-															});
-														}}
-														disabled={combineTransfersMutation.isPending}
+														onClick={() => handleCopyTransfer(transfer)}
+														className="p-2"
 													>
-														<Merge className="h-4 w-4 mr-2" />
-														{combineTransfersMutation.isPending
-															? "Combining..."
-															: "Combine"}
+														{isCopied ? (
+															<Check className="h-4 w-4" />
+														) : (
+															<Copy className="h-4 w-4" />
+														)}
 													</Button>
+													{isMember &&
+														transfer.status !== "complete" &&
+														(transfer.status === "pending" ? (
+															<Button
+																size="sm"
+																variant="outline"
+																onClick={() =>
+																	updateTransferStatusMutation.mutate({
+																		transferId: transfer.id,
+																		status: "sent",
+																	})
+																}
+																disabled={
+																	updateTransferStatusMutation.isPending
+																}
+															>
+																Mark as Sent
+															</Button>
+														) : (
+															<Button
+																size="sm"
+																variant="outline"
+																onClick={() =>
+																	updateTransferStatusMutation.mutate({
+																		transferId: transfer.id,
+																		status: "complete",
+																	})
+																}
+																disabled={
+																	updateTransferStatusMutation.isPending
+																}
+															>
+																Mark as Complete
+															</Button>
+														))}
+												</div>
+											</div>
+										);
+									};
+
+									const renderTransferGroup = (
+										groupKey: string,
+										groupTransfers: TransfersResponse[],
+										isCompleted: boolean,
+									) => {
+										if (groupTransfers.length === 1) {
+											return renderTransfer(groupTransfers[0]);
+										}
+
+										const totalAmount = groupTransfers.reduce(
+											(sum, t) => sum + (t.amount || 0),
+											0,
+										);
+										const canCombine =
+											isMember &&
+											!isCompleted &&
+											groupTransfers.every((t) => t.status === "pending");
+
+										return (
+											<div
+												key={groupKey}
+												className="space-y-2 border-l-2 border-primary/30 pl-3"
+											>
+												{groupTransfers.map((transfer) =>
+													renderTransfer(transfer),
+												)}
+												{canCombine && (
+													<div className="flex items-center justify-between p-2 bg-primary/5 rounded-md border border-primary/20">
+														<div className="flex items-center gap-2">
+															<span className="text-sm text-muted-foreground">
+																{groupTransfers.length} transfers → Combined:{" "}
+																{formatNumber(totalAmount)} gp
+															</span>
+														</div>
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() => {
+																combineTransfersMutation.mutate({
+																	transferIds: groupTransfers.map((t) => t.id),
+																	from: groupTransfers[0].from || "",
+																	to: groupTransfers[0].to || "",
+																	totalAmount,
+																});
+															}}
+															disabled={combineTransfersMutation.isPending}
+														>
+															<Merge className="h-4 w-4 mr-2" />
+															{combineTransfersMutation.isPending
+																? "Combining..."
+																: "Combine"}
+														</Button>
+													</div>
+												)}
+											</div>
+										);
+									};
+
+									return (
+										<div className="space-y-4">
+											{/* Incomplete Transfers */}
+											{incompleteTransfers.length > 0 && (
+												<div className="space-y-3">
+													{Array.from(incompleteGroups.entries()).map(
+														([key, group]) =>
+															renderTransferGroup(key, group, false),
+													)}
+												</div>
+											)}
+
+											{/* Completed Transfers (Collapsible) */}
+											{completedTransfers.length > 0 && (
+												<div>
+													<button
+														type="button"
+														onClick={() =>
+															setShowCompletedTransfers(!showCompletedTransfers)
+														}
+														className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
+													>
+														{showCompletedTransfers ? (
+															<ChevronUp className="h-4 w-4" />
+														) : (
+															<ChevronDown className="h-4 w-4" />
+														)}
+														Completed Transfers ({completedTransfers.length})
+													</button>
+													{showCompletedTransfers && (
+														<div className="space-y-3">
+															{Array.from(completedGroups.entries()).map(
+																([key, group]) =>
+																	renderTransferGroup(key, group, true),
+															)}
+														</div>
+													)}
 												</div>
 											)}
 										</div>
 									);
-								};
-
-								return (
-									<div className="space-y-4">
-										{/* Incomplete Transfers */}
-										{incompleteTransfers.length > 0 && (
-											<div className="space-y-3">
-												{Array.from(incompleteGroups.entries()).map(
-													([key, group]) =>
-														renderTransferGroup(key, group, false),
-												)}
-											</div>
-										)}
-
-										{/* Completed Transfers (Collapsible) */}
-										{completedTransfers.length > 0 && (
-											<div>
-												<button
-													type="button"
-													onClick={() =>
-														setShowCompletedTransfers(!showCompletedTransfers)
-													}
-													className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
-												>
-													{showCompletedTransfers ? (
-														<ChevronUp className="h-4 w-4" />
-													) : (
-														<ChevronDown className="h-4 w-4" />
-													)}
-													Completed Transfers ({completedTransfers.length})
-												</button>
-												{showCompletedTransfers && (
-													<div className="space-y-3">
-														{Array.from(completedGroups.entries()).map(
-															([key, group]) =>
-																renderTransferGroup(key, group, true),
-														)}
-													</div>
-												)}
-											</div>
-										)}
-									</div>
-								);
-							})()}
-						</>
-					)}
+								})()}
+							</>
+						)}
+					</div>
 				</div>
 			</div>
 
