@@ -1,7 +1,20 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Check, Copy } from "lucide-react";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	createFileRoute,
+	Link,
+	useNavigate,
+	useParams,
+} from "@tanstack/react-router";
+import {
+	ArrowLeft,
+	Check,
+	ChevronDown,
+	ChevronUp,
+	Copy,
+	Merge,
+	Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -12,7 +25,12 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import pb, { useAuth } from "@/lib/pb";
-import type { GroupsResponse, UsersResponse } from "@/lib/pocketbase-types";
+import type {
+	CollectionResponses,
+	GroupsResponse,
+	TransfersResponse,
+	UsersResponse,
+} from "@/lib/pocketbase-types";
 
 export const Route = createFileRoute("/groups/$id")({
 	component: RouteComponent,
@@ -21,30 +39,107 @@ export const Route = createFileRoute("/groups/$id")({
 type GroupWithExpand = GroupsResponse<{
 	owner?: UsersResponse;
 	members?: UsersResponse[];
+	transfers?: TransfersResponse[];
 }>;
 
 function RouteComponent() {
 	const { id } = useParams({ from: "/groups/$id" });
 	const auth = useAuth();
+	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const [inviteLink, setInviteLink] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
+	const [showCompletedTransfers, setShowCompletedTransfers] = useState(false);
+	const [copiedTransferId, setCopiedTransferId] = useState<string | null>(null);
 
-	// Fetch group
+	// Fetch group with expanded transfers
 	const {
 		data: group,
 		isLoading,
 		error,
+		refetch,
 	} = useQuery<GroupWithExpand>({
 		queryKey: ["group", id],
 		queryFn: async () => {
-			return await pb.collection("groups").getOne<GroupWithExpand>(id, {
-				expand: "owner,members",
-			});
+			const groupData = await pb
+				.collection("groups")
+				.getOne<GroupWithExpand>(id, {
+					expand: "owner,members",
+				});
+
+			// Fetch transfers for this group
+			const transfers = await pb
+				.collection("transfers")
+				.getFullList<TransfersResponse>({
+					filter: `group = "${id}"`,
+					sort: "-created",
+				});
+
+			return {
+				...groupData,
+				expand: {
+					...groupData.expand,
+					transfers,
+				},
+			};
 		},
 		enabled: auth.isAuthenticated && !!id,
 		retry: false, // Don't retry on 404 errors
 	});
+
+	// Subscribe to real-time changes
+	useEffect(() => {
+		if (!auth.isAuthenticated || !id) {
+			return;
+		}
+
+		let unsubscribe: (() => void) | null = null;
+
+		// Subscribe to group changes (this will also refetch transfers since they're fetched together)
+		pb.collection("groups")
+			.subscribe(id, (e) => {
+				if (e.action === "update") {
+					// Refetch when group is updated (includes transfers)
+					refetch();
+				} else if (e.action === "delete") {
+					// Navigate away if group is deleted
+					navigate({ to: "/groups" });
+				}
+			})
+			.then((unsub) => {
+				unsubscribe = unsub;
+			})
+			.catch((err) => {
+				console.error("Failed to subscribe to group changes:", err);
+			});
+
+		// Also subscribe to transfers to catch transfer updates
+		let unsubscribeTransfers: (() => void) | null = null;
+		pb.collection("transfers")
+			.subscribe("*", (e) => {
+				if (e.record && e.record.group === id) {
+					// Refetch group (which includes transfers) when any transfer for this group changes
+					refetch();
+				}
+			})
+			.then((unsub) => {
+				unsubscribeTransfers = unsub;
+			})
+			.catch((err) => {
+				console.error("Failed to subscribe to transfer changes:", err);
+			});
+
+		return () => {
+			if (unsubscribe) {
+				unsubscribe();
+			}
+			if (unsubscribeTransfers) {
+				unsubscribeTransfers();
+			}
+		};
+	}, [auth.isAuthenticated, id, refetch, navigate]);
 
 	// Create invitation mutation (must be called before any conditional returns)
 	const createInvitationMutation = useMutation({
@@ -69,6 +164,74 @@ function RouteComponent() {
 			const link = `${baseUrl}/groups/invite/${token}`;
 			setInviteLink(link);
 			return invitation;
+		},
+	});
+
+	// Delete group mutation
+	const deleteGroupMutation = useMutation({
+		mutationFn: async () => {
+			await pb.collection("groups").delete(id);
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["groups"] });
+			navigate({ to: "/groups" });
+		},
+	});
+
+	// Update transfer status mutation
+	const updateTransferStatusMutation = useMutation({
+		mutationFn: async ({
+			transferId,
+			status,
+		}: {
+			transferId: string;
+			status: "pending" | "sent" | "complete";
+		}) => {
+			await pb.collection("transfers").update(transferId, { status });
+		},
+		onSuccess: () => {
+			// Refetch group which includes transfers
+			refetch();
+		},
+	});
+
+	// Combine transfers mutation
+	const combineTransfersMutation = useMutation({
+		mutationFn: async ({
+			transferIds,
+			from,
+			to,
+			totalAmount,
+		}: {
+			transferIds: string[];
+			from: string;
+			to: string;
+			totalAmount: number;
+		}) => {
+			// Create the combined transfer
+			const combinedTransfer = await pb
+				.collection("transfers")
+				.create<CollectionResponses["transfers"]>(
+					{
+						group: id,
+						from,
+						to,
+						amount: totalAmount,
+						status: "pending",
+					},
+					{ requestKey: null },
+				);
+
+			// Delete the original transfers
+			for (const transferId of transferIds) {
+				await pb.collection("transfers").delete(transferId);
+			}
+
+			return combinedTransfer;
+		},
+		onSuccess: () => {
+			// Refetch group which includes transfers
+			refetch();
 		},
 	});
 
@@ -144,6 +307,7 @@ function RouteComponent() {
 	const ownerName =
 		group.expand?.owner?.name || group.expand?.owner?.username || "Unknown";
 	const members = group.expand?.members || [];
+	const transfers = group.expand?.transfers || [];
 
 	const handleCopyLink = async () => {
 		if (inviteLink) {
@@ -151,6 +315,14 @@ function RouteComponent() {
 			setCopied(true);
 			setTimeout(() => setCopied(false), 2000);
 		}
+	};
+
+	const handleCopyTransfer = async (transfer: TransfersResponse) => {
+		// Use raw number without commas for the transfer command
+		const text = `transfer ${transfer.amount || 0} to ${transfer.to}`;
+		await navigator.clipboard.writeText(text);
+		setCopiedTransferId(transfer.id);
+		setTimeout(() => setCopiedTransferId(null), 2000);
 	};
 
 	return (
@@ -172,11 +344,23 @@ function RouteComponent() {
 								Created {new Date(group.created).toLocaleDateString()}
 							</p>
 						</div>
-						{isOwner && (
-							<span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
-								Owner
-							</span>
-						)}
+						<div className="flex items-center gap-2">
+							{isOwner && (
+								<span className="text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
+									Owner
+								</span>
+							)}
+							{isOwner && (
+								<Button
+									variant="destructive"
+									size="sm"
+									onClick={() => setIsDeleteDialogOpen(true)}
+								>
+									<Trash2 className="h-4 w-4 mr-2" />
+									Delete Group
+								</Button>
+							)}
+						</div>
 					</div>
 				</div>
 
@@ -241,6 +425,238 @@ function RouteComponent() {
 						</div>
 					)}
 				</div>
+
+				{/* Transfers Section */}
+				<div className="border rounded-lg p-6 bg-card">
+					<h2 className="text-xl font-semibold mb-4">
+						Transfers ({transfers?.length || 0})
+					</h2>
+					{transfers.length === 0 ? (
+						<p className="text-muted-foreground">
+							No transfers yet. Save a loot split session to create transfers.
+						</p>
+					) : (
+						<>
+							{(() => {
+								const formatNumber = (num: number): string => {
+									return num.toLocaleString("en-US");
+								};
+
+								const getStatusColor = (status: string) => {
+									switch (status) {
+										case "complete":
+											return "bg-green-500/10 text-green-600 dark:text-green-400";
+										case "sent":
+											return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+										default:
+											return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400";
+									}
+								};
+
+								// Group transfers by from and to
+								const groupTransfers = (
+									transferList: TransfersResponse[],
+								): Map<string, TransfersResponse[]> => {
+									const groups = new Map<string, TransfersResponse[]>();
+									for (const transfer of transferList) {
+										const key = `${transfer.from}→${transfer.to}`;
+										if (!groups.has(key)) {
+											groups.set(key, []);
+										}
+										const group = groups.get(key);
+										if (group) {
+											group.push(transfer);
+										}
+									}
+									return groups;
+								};
+
+								const incompleteTransfers = transfers.filter(
+									(t) => t.status !== "complete",
+								);
+								const completedTransfers = transfers.filter(
+									(t) => t.status === "complete",
+								);
+
+								const incompleteGroups = groupTransfers(incompleteTransfers);
+								const completedGroups = groupTransfers(completedTransfers);
+
+								const renderTransfer = (transfer: TransfersResponse) => {
+									const isCopied = copiedTransferId === transfer.id;
+									return (
+										<div
+											key={transfer.id}
+											className="flex items-center justify-between p-3 rounded-md bg-accent/50"
+										>
+											<div className="flex items-center gap-3 flex-1">
+												<div className="flex items-center gap-2">
+													<span className="font-semibold">{transfer.from}</span>
+													<span className="text-muted-foreground">→</span>
+													<span className="font-semibold">{transfer.to}</span>
+												</div>
+												<span className="font-semibold text-lg">
+													{formatNumber(transfer.amount || 0)} gp
+												</span>
+											</div>
+											<div className="flex items-center gap-2">
+												<span
+													className={`text-xs px-2 py-1 rounded capitalize ${getStatusColor(
+														transfer.status || "pending",
+													)}`}
+												>
+													{transfer.status || "pending"}
+												</span>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() => handleCopyTransfer(transfer)}
+													className="p-2"
+												>
+													{isCopied ? (
+														<Check className="h-4 w-4" />
+													) : (
+														<Copy className="h-4 w-4" />
+													)}
+												</Button>
+												{isMember &&
+													transfer.status !== "complete" &&
+													(transfer.status === "pending" ? (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																updateTransferStatusMutation.mutate({
+																	transferId: transfer.id,
+																	status: "sent",
+																})
+															}
+															disabled={updateTransferStatusMutation.isPending}
+														>
+															Mark as Sent
+														</Button>
+													) : (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																updateTransferStatusMutation.mutate({
+																	transferId: transfer.id,
+																	status: "complete",
+																})
+															}
+															disabled={updateTransferStatusMutation.isPending}
+														>
+															Mark as Complete
+														</Button>
+													))}
+											</div>
+										</div>
+									);
+								};
+
+								const renderTransferGroup = (
+									groupKey: string,
+									groupTransfers: TransfersResponse[],
+									isCompleted: boolean,
+								) => {
+									if (groupTransfers.length === 1) {
+										return renderTransfer(groupTransfers[0]);
+									}
+
+									const totalAmount = groupTransfers.reduce(
+										(sum, t) => sum + (t.amount || 0),
+										0,
+									);
+									const canCombine =
+										isMember &&
+										!isCompleted &&
+										groupTransfers.every((t) => t.status === "pending");
+
+									return (
+										<div
+											key={groupKey}
+											className="space-y-2 border-l-2 border-primary/30 pl-3"
+										>
+											{groupTransfers.map((transfer) =>
+												renderTransfer(transfer),
+											)}
+											{canCombine && (
+												<div className="flex items-center justify-between p-2 bg-primary/5 rounded-md border border-primary/20">
+													<div className="flex items-center gap-2">
+														<span className="text-sm text-muted-foreground">
+															{groupTransfers.length} transfers → Combined:{" "}
+															{formatNumber(totalAmount)} gp
+														</span>
+													</div>
+													<Button
+														size="sm"
+														variant="outline"
+														onClick={() => {
+															combineTransfersMutation.mutate({
+																transferIds: groupTransfers.map((t) => t.id),
+																from: groupTransfers[0].from || "",
+																to: groupTransfers[0].to || "",
+																totalAmount,
+															});
+														}}
+														disabled={combineTransfersMutation.isPending}
+													>
+														<Merge className="h-4 w-4 mr-2" />
+														{combineTransfersMutation.isPending
+															? "Combining..."
+															: "Combine"}
+													</Button>
+												</div>
+											)}
+										</div>
+									);
+								};
+
+								return (
+									<div className="space-y-4">
+										{/* Incomplete Transfers */}
+										{incompleteTransfers.length > 0 && (
+											<div className="space-y-3">
+												{Array.from(incompleteGroups.entries()).map(
+													([key, group]) =>
+														renderTransferGroup(key, group, false),
+												)}
+											</div>
+										)}
+
+										{/* Completed Transfers (Collapsible) */}
+										{completedTransfers.length > 0 && (
+											<div>
+												<button
+													type="button"
+													onClick={() =>
+														setShowCompletedTransfers(!showCompletedTransfers)
+													}
+													className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
+												>
+													{showCompletedTransfers ? (
+														<ChevronUp className="h-4 w-4" />
+													) : (
+														<ChevronDown className="h-4 w-4" />
+													)}
+													Completed Transfers ({completedTransfers.length})
+												</button>
+												{showCompletedTransfers && (
+													<div className="space-y-3">
+														{Array.from(completedGroups.entries()).map(
+															([key, group]) =>
+																renderTransferGroup(key, group, true),
+														)}
+													</div>
+												)}
+											</div>
+										)}
+									</div>
+								);
+							})()}
+						</>
+					)}
+				</div>
 			</div>
 
 			{/* Invite Dialog */}
@@ -286,6 +702,35 @@ function RouteComponent() {
 							}}
 						>
 							Close
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Delete Confirmation Dialog */}
+			<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete Group</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete "{group.name}"? This action cannot
+							be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => setIsDeleteDialogOpen(false)}
+							disabled={deleteGroupMutation.isPending}
+						>
+							Cancel
+						</Button>
+						<Button
+							variant="destructive"
+							onClick={() => deleteGroupMutation.mutate()}
+							disabled={deleteGroupMutation.isPending}
+						>
+							{deleteGroupMutation.isPending ? "Deleting..." : "Delete"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

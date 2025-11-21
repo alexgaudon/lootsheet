@@ -13,6 +13,7 @@ export enum Collections {
 	Superusers = "_superusers",
 	GroupInvitations = "group_invitations",
 	Groups = "groups",
+	Transfers = "transfers",
 	Users = "users",
 }
 
@@ -114,9 +115,26 @@ export type GroupsRecord = {
 	updated: IsoAutoDateString
 }
 
+export enum TransfersStatusOptions {
+	"pending" = "pending",
+	"sent" = "sent",
+	"complete" = "complete",
+}
+export type TransfersRecord = {
+	amount?: number
+	created: IsoAutoDateString
+	from?: string
+	group?: RecordIdString
+	id: string
+	status?: TransfersStatusOptions
+	to?: string
+	updated: IsoAutoDateString
+}
+
 export type UsersRecord = {
 	avatar?: FileNameString
 	created: IsoAutoDateString
+	discordId?: string
 	email: string
 	emailVisibility?: boolean
 	id: string
@@ -135,6 +153,7 @@ export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemF
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> & AuthSystemFields<Texpand>
 export type GroupInvitationsResponse<Texpand = unknown> = Required<GroupInvitationsRecord> & BaseSystemFields<Texpand>
 export type GroupsResponse<Texpand = unknown> = Required<GroupsRecord> & BaseSystemFields<Texpand>
+export type TransfersResponse<Texpand = unknown> = Required<TransfersRecord> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
 
 // Types containing all Records and Responses, useful for creating typing helper functions
@@ -147,6 +166,7 @@ export type CollectionRecords = {
 	_superusers: SuperusersRecord
 	group_invitations: GroupInvitationsRecord
 	groups: GroupsRecord
+	transfers: TransfersRecord
 	users: UsersRecord
 }
 
@@ -158,6 +178,7 @@ export type CollectionResponses = {
 	_superusers: SuperusersResponse
 	group_invitations: GroupInvitationsResponse
 	groups: GroupsResponse
+	transfers: TransfersResponse
 	users: UsersResponse
 }
 

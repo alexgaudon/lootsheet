@@ -12,6 +12,38 @@ import (
 func main() {
 	app := pocketbase.New()
 
+	// fires for every auth collection
+	app.OnRecordAuthRequest().BindFunc(func(e *core.RecordAuthRequestEvent) error {
+		metaMap, ok := e.Meta.(map[string]any)
+		if !ok {
+			return e.Next()
+		}
+
+		rawID, exists := metaMap["id"]
+		if !exists {
+			return e.Next()
+		}
+
+		discordID, ok := rawID.(string)
+		if !ok || discordID == "" {
+			return e.Next()
+		}
+
+		if e.Record.GetString("discordId") == discordID {
+			return e.Next()
+		}
+
+		e.Record.Set("discordId", discordID)
+
+		err := app.Save(e.Record)
+
+		if err != nil {
+			app.Logger().Error(fmt.Sprintf("failed to save discordId to user record: %v", err))
+		}
+
+		return e.Next()
+	})
+
 	app.OnRecordCreateRequest("users").BindFunc(func(e *core.RecordRequestEvent) error {
 		name := e.Record.GetString("name")
 		if idx := strings.Index(name, "#"); idx != -1 {

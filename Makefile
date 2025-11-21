@@ -18,8 +18,11 @@ dev-backend:
 	cd apps/backend && go run . serve
 
 dev:
-	bun run --cwd apps/frontend dev & \
-	cd apps/backend && go run . serve
+	./launch.sh
 
 docker-build:
 	docker build . -t lootsheet:latest
+
+pb-types:
+	cd apps/frontend && npx pocketbase-typegen --db ../backend/pb_data/data.db --out ./src/lib/pocketbase-types.ts
+
