@@ -11,6 +11,8 @@ export enum Collections {
 	Mfas = "_mfas",
 	Otps = "_otps",
 	Superusers = "_superusers",
+	GroupInvitations = "group_invitations",
+	Groups = "groups",
 	Users = "users",
 }
 
@@ -92,6 +94,26 @@ export type SuperusersRecord = {
 	verified?: boolean
 }
 
+export type GroupInvitationsRecord = {
+	accepted?: boolean
+	created: IsoAutoDateString
+	group?: RecordIdString
+	id: string
+	inviter?: RecordIdString
+	token?: string
+	updated: IsoAutoDateString
+	used?: boolean
+}
+
+export type GroupsRecord = {
+	created: IsoAutoDateString
+	id: string
+	members?: RecordIdString[]
+	name?: string
+	owner?: RecordIdString
+	updated: IsoAutoDateString
+}
+
 export type UsersRecord = {
 	avatar?: FileNameString
 	created: IsoAutoDateString
@@ -111,6 +133,8 @@ export type ExternalauthsResponse<Texpand = unknown> = Required<ExternalauthsRec
 export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemFields<Texpand>
 export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> & AuthSystemFields<Texpand>
+export type GroupInvitationsResponse<Texpand = unknown> = Required<GroupInvitationsRecord> & BaseSystemFields<Texpand>
+export type GroupsResponse<Texpand = unknown> = Required<GroupsRecord> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
 
 // Types containing all Records and Responses, useful for creating typing helper functions
@@ -121,6 +145,8 @@ export type CollectionRecords = {
 	_mfas: MfasRecord
 	_otps: OtpsRecord
 	_superusers: SuperusersRecord
+	group_invitations: GroupInvitationsRecord
+	groups: GroupsRecord
 	users: UsersRecord
 }
 
@@ -130,6 +156,8 @@ export type CollectionResponses = {
 	_mfas: MfasResponse
 	_otps: OtpsResponse
 	_superusers: SuperusersResponse
+	group_invitations: GroupInvitationsResponse
+	groups: GroupsResponse
 	users: UsersResponse
 }
 

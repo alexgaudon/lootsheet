@@ -20,8 +20,8 @@ function getInitials(record: CollectionResponses["users"]): string {
 		}
 		return parts[0][0].toUpperCase();
 	}
-	if (record.email) {
-		return record.email[0].toUpperCase();
+	if (record.username) {
+		return record.username[0].toUpperCase();
 	}
 	return "?";
 }
@@ -50,7 +50,7 @@ export function UserAvatar() {
 			{avatarUrl && (
 				<AvatarImage
 					src={avatarUrl}
-					alt={userRecord.name || userRecord.email}
+					alt={userRecord.name || userRecord.username || "User"}
 				/>
 			)}
 			<AvatarFallback>{initials}</AvatarFallback>

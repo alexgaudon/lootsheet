@@ -3,7 +3,7 @@ import { DiscordButton } from "@/components/auth/discord-button";
 import { UserAvatar } from "@/components/auth/user-avatar";
 import { useAuth } from "@/lib/pb";
 import type { CollectionResponses } from "@/lib/pocketbase-types";
-import { cn } from "@/lib/utils";
+import { cn, formatDiscordName } from "@/lib/utils";
 
 export type NavLink = {
 	label: string;
@@ -12,30 +12,26 @@ export type NavLink = {
 };
 
 export const NAV_LINKS: NavLink[] = [
-	{ label: "Dashboard", to: "/dashboard", requiresAuth: true },
 	{
 		label: "Loot Split",
 		to: "/loot-split",
 	},
+	{ label: "Groups", to: "/groups", requiresAuth: true },
 ];
-
-function stripDiscriminator(value: string): string {
-	return value.split("#")[0];
-}
 
 function getDisplayName(record: CollectionResponses["users"] | null): string {
 	if (!record) return "";
 
 	// Prefer name field if available, but clean discriminator
-	if (record.name) return stripDiscriminator(record.name);
+	if (record.name) return formatDiscordName(record.name);
 
 	// Clean username by removing Discord discriminator (e.g., "amgau#0" -> "amgau")
 	if (record.username) {
-		return stripDiscriminator(record.username);
+		return formatDiscordName(record.username);
 	}
 
-	// Fall back to email or default
-	return record.email || "User";
+	// Fall back to default
+	return "User";
 }
 
 export function Header() {

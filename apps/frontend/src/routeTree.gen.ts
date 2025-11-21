@@ -10,11 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LootSplitRouteImport } from './routes/loot-split'
+import { Route as GroupsRouteImport } from './routes/groups'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GroupsIndexRouteImport } from './routes/groups.index'
+import { Route as GroupsIdRouteImport } from './routes/groups.$id'
+import { Route as GroupsInviteTokenRouteImport } from './routes/groups.invite.$token'
 
 const LootSplitRoute = LootSplitRouteImport.update({
   id: '/loot-split',
   path: '/loot-split',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupsRoute = GroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -22,30 +31,70 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GroupsIndexRoute = GroupsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => GroupsRoute,
+} as any)
+const GroupsIdRoute = GroupsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => GroupsRoute,
+} as any)
+const GroupsInviteTokenRoute = GroupsInviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => GroupsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/groups': typeof GroupsRouteWithChildren
   '/loot-split': typeof LootSplitRoute
+  '/groups/$id': typeof GroupsIdRoute
+  '/groups/': typeof GroupsIndexRoute
+  '/groups/invite/$token': typeof GroupsInviteTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/loot-split': typeof LootSplitRoute
+  '/groups/$id': typeof GroupsIdRoute
+  '/groups': typeof GroupsIndexRoute
+  '/groups/invite/$token': typeof GroupsInviteTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/groups': typeof GroupsRouteWithChildren
   '/loot-split': typeof LootSplitRoute
+  '/groups/$id': typeof GroupsIdRoute
+  '/groups/': typeof GroupsIndexRoute
+  '/groups/invite/$token': typeof GroupsInviteTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/loot-split'
+  fullPaths:
+    | '/'
+    | '/groups'
+    | '/loot-split'
+    | '/groups/$id'
+    | '/groups/'
+    | '/groups/invite/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/loot-split'
-  id: '__root__' | '/' | '/loot-split'
+  to: '/' | '/loot-split' | '/groups/$id' | '/groups' | '/groups/invite/$token'
+  id:
+    | '__root__'
+    | '/'
+    | '/groups'
+    | '/loot-split'
+    | '/groups/$id'
+    | '/groups/'
+    | '/groups/invite/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GroupsRoute: typeof GroupsRouteWithChildren
   LootSplitRoute: typeof LootSplitRoute
 }
 
@@ -58,6 +107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LootSplitRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/groups': {
+      id: '/groups'
+      path: '/groups'
+      fullPath: '/groups'
+      preLoaderRoute: typeof GroupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -65,11 +121,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/groups/': {
+      id: '/groups/'
+      path: '/'
+      fullPath: '/groups/'
+      preLoaderRoute: typeof GroupsIndexRouteImport
+      parentRoute: typeof GroupsRoute
+    }
+    '/groups/$id': {
+      id: '/groups/$id'
+      path: '/$id'
+      fullPath: '/groups/$id'
+      preLoaderRoute: typeof GroupsIdRouteImport
+      parentRoute: typeof GroupsRoute
+    }
+    '/groups/invite/$token': {
+      id: '/groups/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/groups/invite/$token'
+      preLoaderRoute: typeof GroupsInviteTokenRouteImport
+      parentRoute: typeof GroupsRoute
+    }
   }
 }
 
+interface GroupsRouteChildren {
+  GroupsIdRoute: typeof GroupsIdRoute
+  GroupsIndexRoute: typeof GroupsIndexRoute
+  GroupsInviteTokenRoute: typeof GroupsInviteTokenRoute
+}
+
+const GroupsRouteChildren: GroupsRouteChildren = {
+  GroupsIdRoute: GroupsIdRoute,
+  GroupsIndexRoute: GroupsIndexRoute,
+  GroupsInviteTokenRoute: GroupsInviteTokenRoute,
+}
+
+const GroupsRouteWithChildren =
+  GroupsRoute._addFileChildren(GroupsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GroupsRoute: GroupsRouteWithChildren,
   LootSplitRoute: LootSplitRoute,
 }
 export const routeTree = rootRouteImport
