@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 
 import * as TanStackQueryProvider from './integrations/tanstack-query/root-provider.tsx'
+import { getCurrentAuthState } from '@/lib/pb'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
@@ -17,6 +18,7 @@ const router = createRouter({
   routeTree,
   context: {
     ...TanStackQueryProviderContext,
+    authState: getCurrentAuthState(),
   },
   defaultPreload: 'intent',
   scrollRestoration: true,

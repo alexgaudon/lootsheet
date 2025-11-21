@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, Copy, ExternalLink, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,6 @@ type GroupWithExpand = GroupsResponse<{
 
 function RouteComponent() {
 	const auth = useAuth();
-	const navigate = useNavigate();
 	const [sessionText, setSessionText] = useState("");
 	const [parsedSession, setParsedSession] = useState<ParsedSession | null>(
 		null,
@@ -43,6 +42,7 @@ function RouteComponent() {
 	const [saveSuccess, setSaveSuccess] = useState<{
 		groupId: string;
 		groupName: string;
+		count: number;
 	} | null>(null);
 
 	// Fetch user's groups
