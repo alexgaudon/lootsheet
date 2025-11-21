@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  lootsheet:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lootsheet
+    ports:
+      - "8090:8090"
+    volumes:
+      # Persist PocketBase data
+      - ./apps/backend/pb_data:/root/pb_data
+    environment:
+      # Optional: Set PocketBase data directory
+      - PB_DATA_DIR=/root/pb_data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+

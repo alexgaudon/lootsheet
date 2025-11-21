@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Build artifacts
+apps/backend/lootsheet
+apps/backend/pb_public
+apps/frontend/dist
+apps/frontend/node_modules
+
+# Data directories
+apps/backend/pb_data
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+
