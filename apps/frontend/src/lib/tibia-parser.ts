@@ -264,3 +264,116 @@ export function calculateTransfers(
 
 	return transfers;
 }
+
+/**
+ * Calculates the cost of Tibia blessings based on character level.
+ * Formulas based on: https://tibia.fandom.com/wiki/Blessings#Price
+ *
+ * @param level - Character level (must be >= 1)
+ * @returns Object containing costs for different blessing combinations
+ */
+export interface BlessingCosts {
+	/** Cost for the 5 regular blessings (The Spiritual Shielding, The Fire of the Suns, The Spark of the Phoenix, The Embrace of Tibia, The Wisdom of Solitude) */
+	fiveRegular: number;
+	/** Cost for all 7 blessings (includes Blood of the Mountain and Heart of the Mountain) */
+	allSeven: number;
+	/** Cost for all 7 blessings plus Twist of Fate */
+	allSevenWithTwist: number;
+	/** Individual blessing costs */
+	individual: {
+		spiritualShielding: number;
+		fireOfTheSuns: number;
+		sparkOfThePhoenix: number;
+		embraceOfTibia: number;
+		wisdomOfSolitude: number;
+		heartOfTheMountain: number;
+		bloodOfTheMountain: number;
+		twistOfFate: number;
+	};
+}
+
+export function calculateBlessingCost(level: number): BlessingCosts {
+	if (level < 1) {
+		throw new Error("Level must be at least 1");
+	}
+
+	// Individual blessing formulas based on Tibia Wiki
+	const spiritualShielding = (L: number): number => {
+		if (L <= 30) return 2000;
+		if (L < 120) return 200 * (L - 20);
+		return 20000 + 75 * (L - 120);
+	};
+
+	const fireOfTheSuns = (L: number): number => {
+		if (L <= 30) return 2000;
+		if (L < 120) return 200 * (L - 20);
+		return 20000 + 75 * (L - 120);
+	};
+
+	const sparkOfThePhoenix = (L: number): number => {
+		if (L <= 30) return 2000;
+		if (L < 120) return 200 * (L - 20);
+		return 20000 + 75 * (L - 120);
+	};
+
+	const embraceOfTibia = (L: number): number => {
+		if (L <= 30) return 2000;
+		if (L < 120) return 200 * (L - 20);
+		return 20000 + 75 * (L - 120);
+	};
+
+	const wisdomOfSolitude = (L: number): number => {
+		if (L <= 30) return 2000;
+		if (L < 120) return 200 * (L - 20);
+		return 20000 + 75 * (L - 120);
+	};
+
+	const heartOfTheMountain = (L: number): number => {
+		if (L <= 30) return 2600;
+		if (L < 120) return 260 * (L - 20);
+		return 26000 + 100 * (L - 120);
+	};
+
+	const bloodOfTheMountain = (L: number): number => {
+		if (L <= 30) return 2000;
+		if (L < 120) return 200 * (L - 20);
+		return 20000 + 75 * (L - 120);
+	};
+
+	const twistOfFate = (L: number): number => {
+		if (L <= 30) return 2000;
+		if (L < 270) return 200 * (L - 20);
+		return 50000;
+	};
+
+	const individual = {
+		spiritualShielding: spiritualShielding(level),
+		fireOfTheSuns: fireOfTheSuns(level),
+		sparkOfThePhoenix: sparkOfThePhoenix(level),
+		embraceOfTibia: embraceOfTibia(level),
+		wisdomOfSolitude: wisdomOfSolitude(level),
+		heartOfTheMountain: heartOfTheMountain(level),
+		bloodOfTheMountain: bloodOfTheMountain(level),
+		twistOfFate: twistOfFate(level),
+	};
+
+	// Calculate combinations
+	const fiveRegular =
+		individual.spiritualShielding +
+		individual.fireOfTheSuns +
+		individual.sparkOfThePhoenix +
+		individual.embraceOfTibia +
+		individual.wisdomOfSolitude;
+
+	const allSeven =
+		fiveRegular + individual.heartOfTheMountain + individual.bloodOfTheMountain;
+
+	const allSevenWithTwist = allSeven + individual.twistOfFate;
+
+	return {
+		fiveRegular,
+		allSeven,
+		allSevenWithTwist,
+		individual,
+	};
+}

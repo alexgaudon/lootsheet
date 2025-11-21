@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, Copy, ExternalLink, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -11,6 +11,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import pb, { useAuth } from "@/lib/pb";
 import type {
@@ -18,7 +19,13 @@ import type {
 	GroupsResponse,
 	UsersResponse,
 } from "@/lib/pocketbase-types";
-import { type ParsedSession, parseTibiaSession } from "@/lib/tibia-parser";
+import {
+	type ParsedSession,
+	parseTibiaSession,
+	calculateBlessingCost,
+	calculateTransfers,
+	type Player,
+} from "@/lib/tibia-parser";
 
 export const Route = createFileRoute("/loot-split")({
 	component: RouteComponent,
@@ -44,6 +51,12 @@ function RouteComponent() {
 		groupName: string;
 		count: number;
 	} | null>(null);
+	// Track extra waste per player: player name -> extra waste amount
+	const [extraWaste, setExtraWaste] = useState<Record<string, number>>({});
+	// Track which player's modal is open
+	const [openWasteModal, setOpenWasteModal] = useState<string | null>(null);
+	// Track temporary input value in modal
+	const [tempWasteInput, setTempWasteInput] = useState<string>("");
 
 	// Fetch user's groups
 	const { data: groups = [] } = useQuery<GroupWithExpand[]>({
@@ -153,8 +166,105 @@ function RouteComponent() {
 		if (result === null) {
 			setError("Failed to parse session data. Please check the format.");
 			setParsedSession(null);
+			setExtraWaste({});
 		} else {
 			setParsedSession(result);
+			// Initialize extra waste tracking for all players
+			const initialWaste: Record<string, number> = {};
+			result.players.forEach((player) => {
+				initialWaste[player.name] = 0;
+			});
+			setExtraWaste(initialWaste);
+		}
+	};
+
+	// Recalculate session with extra waste applied
+	const sessionWithBlessings = useMemo(() => {
+		if (!parsedSession) return null;
+
+		const playersWithExtraWaste: Player[] = parsedSession.players.map((player) => {
+			const additionalWaste = extraWaste[player.name] || 0;
+			return {
+				...player,
+				supplies: player.supplies + additionalWaste,
+				balance: player.balance - additionalWaste,
+			};
+		});
+
+		// Recalculate totals
+		const totalProfit = playersWithExtraWaste.reduce(
+			(sum, p) => sum + p.balance,
+			0,
+		);
+		const totalWaste = playersWithExtraWaste.reduce(
+			(sum, p) => sum + p.supplies,
+			0,
+		);
+
+		const exactProfitPerPlayer = totalProfit / playersWithExtraWaste.length;
+		const roundedProfitPerPlayer = Math.round(exactProfitPerPlayer);
+		const totalRounded = roundedProfitPerPlayer * playersWithExtraWaste.length;
+		const remainder = totalProfit - totalRounded;
+
+		const profitPerPlayer = roundedProfitPerPlayer;
+		const wastePerPlayer = Math.round(totalWaste / playersWithExtraWaste.length);
+
+		const transfers = calculateTransfers(
+			playersWithExtraWaste,
+			exactProfitPerPlayer,
+			remainder,
+		);
+
+		return {
+			...parsedSession,
+			players: playersWithExtraWaste,
+			totalProfit,
+			totalWaste,
+			profitPerPlayer,
+			wastePerPlayer,
+			transfers,
+		};
+	}, [parsedSession, extraWaste]);
+
+	const handleOpenWasteModal = (playerName: string) => {
+		setOpenWasteModal(playerName);
+		setTempWasteInput((extraWaste[playerName] || 0).toString());
+	};
+
+	const handleCloseWasteModal = () => {
+		setOpenWasteModal(null);
+		setTempWasteInput("");
+	};
+
+	const handleSaveExtraWaste = (playerName: string) => {
+		const wasteAmount = parseInt(tempWasteInput.replace(/,/g, "")) || 0;
+		setExtraWaste((prev) => ({
+			...prev,
+			[playerName]: wasteAmount,
+		}));
+		handleCloseWasteModal();
+	};
+
+	const handleCalculateBless = (playerName: string) => {
+		const levelInput = prompt(
+			`Enter level for ${playerName} to calculate blessing cost:`,
+		);
+		if (!levelInput) return;
+
+		const level = parseInt(levelInput);
+		if (isNaN(level) || level < 1) {
+			alert("Please enter a valid level (1 or higher)");
+			return;
+		}
+
+		try {
+			const blessingCosts = calculateBlessingCost(level);
+			const blessingCost = blessingCosts.allSevenWithTwist;
+			const currentWaste = extraWaste[playerName] || 0;
+			setTempWasteInput((currentWaste + blessingCost).toString());
+		} catch (err) {
+			alert("Error calculating blessing cost. Please try again.");
+			console.error("Error calculating blessing cost:", err);
 		}
 	};
 
@@ -201,29 +311,29 @@ function RouteComponent() {
 				</div>
 
 				{/* Results Section */}
-				{parsedSession && (
+				{sessionWithBlessings && (
 					<div className="space-y-6">
 						{/* Session Summary */}
 						<div className="border rounded-lg p-6 bg-card">
 							<h2 className="text-2xl font-semibold mb-4">Session Summary</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-								{parsedSession.duration && (
+								{sessionWithBlessings.duration && (
 									<div>
 										<div className="text-sm text-muted-foreground">
 											Duration
 										</div>
 										<div className="text-lg font-semibold">
-											{parsedSession.duration}
+											{sessionWithBlessings.duration}
 										</div>
 									</div>
 								)}
-								{parsedSession.lootType && (
+								{sessionWithBlessings.lootType && (
 									<div>
 										<div className="text-sm text-muted-foreground">
 											Loot Type
 										</div>
 										<div className="text-lg font-semibold">
-											{parsedSession.lootType}
+											{sessionWithBlessings.lootType}
 										</div>
 									</div>
 								)}
@@ -232,7 +342,7 @@ function RouteComponent() {
 										Total Profit
 									</div>
 									<div className="text-lg font-semibold text-green-600 dark:text-green-400">
-										{formatNumber(parsedSession.totalProfit)} gp
+										{formatNumber(sessionWithBlessings.totalProfit)} gp
 									</div>
 								</div>
 								<div>
@@ -240,7 +350,7 @@ function RouteComponent() {
 										Total Waste
 									</div>
 									<div className="text-lg font-semibold text-red-600 dark:text-red-400">
-										{formatNumber(parsedSession.totalWaste)} gp
+										{formatNumber(sessionWithBlessings.totalWaste)} gp
 									</div>
 								</div>
 								<div>
@@ -248,7 +358,7 @@ function RouteComponent() {
 										Profit per Player
 									</div>
 									<div className="text-lg font-semibold">
-										{formatNumber(parsedSession.profitPerPlayer)} gp
+										{formatNumber(sessionWithBlessings.profitPerPlayer)} gp
 									</div>
 								</div>
 								<div>
@@ -256,26 +366,26 @@ function RouteComponent() {
 										Waste per Player
 									</div>
 									<div className="text-lg font-semibold">
-										{formatNumber(parsedSession.wastePerPlayer)} gp
+										{formatNumber(sessionWithBlessings.wastePerPlayer)} gp
 									</div>
 								</div>
-								{parsedSession.totalLoot && (
+								{sessionWithBlessings.totalLoot && (
 									<div>
 										<div className="text-sm text-muted-foreground">
 											Total Loot
 										</div>
 										<div className="text-lg font-semibold">
-											{formatNumber(parsedSession.totalLoot)} gp
+											{formatNumber(sessionWithBlessings.totalLoot)} gp
 										</div>
 									</div>
 								)}
-								{parsedSession.totalSupplies && (
+								{sessionWithBlessings.totalSupplies && (
 									<div>
 										<div className="text-sm text-muted-foreground">
 											Total Supplies
 										</div>
 										<div className="text-lg font-semibold">
-											{formatNumber(parsedSession.totalSupplies)} gp
+											{formatNumber(sessionWithBlessings.totalSupplies)} gp
 										</div>
 									</div>
 								)}
@@ -293,64 +403,91 @@ function RouteComponent() {
 											<th className="text-right p-2">Loot</th>
 											<th className="text-right p-2">Supplies</th>
 											<th className="text-right p-2">Balance</th>
-											{parsedSession.players.some((p) => p.damage) && (
+											<th className="text-center p-2">Actions</th>
+											{sessionWithBlessings.players.some((p) => p.damage) && (
 												<th className="text-right p-2">Damage</th>
 											)}
-											{parsedSession.players.some((p) => p.healing) && (
+											{sessionWithBlessings.players.some((p) => p.healing) && (
 												<th className="text-right p-2">Healing</th>
 											)}
 										</tr>
 									</thead>
 									<tbody>
-										{parsedSession.players.map((player) => (
-											<tr
-												key={player.name}
-												className="border-b hover:bg-accent/50"
-											>
-												<td className="p-2">
-													{player.name}
-													{player.isLeader && (
-														<span className="ml-2 text-xs text-muted-foreground">
-															(Leader)
-														</span>
-													)}
-												</td>
-												<td className="text-right p-2">
-													{formatNumber(player.loot)} gp
-												</td>
-												<td className="text-right p-2 text-red-600 dark:text-red-400">
-													{formatNumber(player.supplies)} gp
-												</td>
-												<td
-													className={`text-right p-2 font-semibold ${
-														player.balance >= 0
-															? "text-green-600 dark:text-green-400"
-															: "text-red-600 dark:text-red-400"
-													}`}
+										{sessionWithBlessings.players.map((player) => {
+											const additionalWaste = extraWaste[player.name] || 0;
+
+											return (
+												<tr
+													key={player.name}
+													className="border-b hover:bg-accent/50"
 												>
-													{formatNumber(player.balance)} gp
-												</td>
-												{parsedSession.players.some((p) => p.damage) && (
-													<td className="text-right p-2">
-														{player.damage ? formatNumber(player.damage) : "-"}
+													<td className="p-2">
+														{player.name}
+														{player.isLeader && (
+															<span className="ml-2 text-xs text-muted-foreground">
+																(Leader)
+															</span>
+														)}
 													</td>
-												)}
-												{parsedSession.players.some((p) => p.healing) && (
 													<td className="text-right p-2">
-														{player.healing
-															? formatNumber(player.healing)
-															: "-"}
+														{formatNumber(player.loot)} gp
 													</td>
-												)}
-											</tr>
-										))}
+													<td className="text-right p-2 text-red-600 dark:text-red-400">
+														<div>{formatNumber(player.supplies)} gp</div>
+														{additionalWaste > 0 && (
+															<div className="text-xs text-muted-foreground">
+																+{formatNumber(additionalWaste)} extra
+															</div>
+														)}
+													</td>
+													<td className="text-right p-2">
+														<div
+															className={`font-semibold ${
+																player.balance >= 0
+																	? "text-green-600 dark:text-green-400"
+																	: "text-red-600 dark:text-red-400"
+															}`}
+														>
+															{formatNumber(player.balance)} gp
+														</div>
+													</td>
+													<td className="text-center p-2">
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() => handleOpenWasteModal(player.name)}
+														>
+															Add Extra Waste
+														</Button>
+													</td>
+													{sessionWithBlessings.players.some(
+														(p) => p.damage,
+													) && (
+														<td className="text-right p-2">
+															{player.damage
+																? formatNumber(player.damage)
+																: "-"}
+														</td>
+													)}
+													{sessionWithBlessings.players.some(
+														(p) => p.healing,
+													) && (
+														<td className="text-right p-2">
+															{player.healing
+																? formatNumber(player.healing)
+																: "-"}
+														</td>
+													)}
+												</tr>
+											);
+										})}
 									</tbody>
 								</table>
 							</div>
 						</div>
 
 						{/* Transfers Section */}
-						{parsedSession.transfers.length > 0 && (
+						{sessionWithBlessings.transfers.length > 0 && (
 							<div className="border rounded-lg p-6 bg-card">
 								<div className="flex items-center justify-between mb-4">
 									<div>
@@ -373,7 +510,7 @@ function RouteComponent() {
 									)}
 								</div>
 								<div className="space-y-2">
-									{parsedSession.transfers.map((transfer) => {
+									{sessionWithBlessings.transfers.map((transfer) => {
 										const transferKey = `${transfer.from}-${transfer.to}-${transfer.amount}`;
 										const isCopied = copiedTransfer === transferKey;
 										return (
@@ -526,14 +663,14 @@ function RouteComponent() {
 								</Button>
 								<Button
 									onClick={() => {
-										if (selectedGroupId && parsedSession) {
+										if (selectedGroupId && sessionWithBlessings) {
 											setError(null);
 											const selectedGroup = groups.find(
 												(g) => g.id === selectedGroupId,
 											);
 											saveTransfersMutation.mutate({
 												groupId: selectedGroupId,
-												transfers: parsedSession.transfers,
+												transfers: sessionWithBlessings.transfers,
 												groupName: selectedGroup?.name || "Group",
 											});
 										}
@@ -542,7 +679,7 @@ function RouteComponent() {
 										!selectedGroupId ||
 										groups.length === 0 ||
 										saveTransfersMutation.isPending ||
-										!parsedSession
+										!sessionWithBlessings
 									}
 								>
 									{saveTransfersMutation.isPending ? (
@@ -559,6 +696,60 @@ function RouteComponent() {
 					)}
 				</DialogContent>
 			</Dialog>
+
+			{/* Add Extra Waste Dialog */}
+			{openWasteModal && (
+				<Dialog open={!!openWasteModal} onOpenChange={handleCloseWasteModal}>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Add Extra Waste for {openWasteModal}</DialogTitle>
+							<DialogDescription>
+								Add additional waste (e.g., blessing costs, other expenses) to
+								this player's total.
+							</DialogDescription>
+						</DialogHeader>
+						<div className="space-y-4 py-4">
+							<div className="space-y-2">
+								<Label htmlFor="waste-input">Extra Waste (gp)</Label>
+								<Input
+									id="waste-input"
+									type="text"
+									value={tempWasteInput}
+									onChange={(e) => {
+										// Allow numbers and commas
+										const value = e.target.value.replace(/[^0-9,]/g, "");
+										setTempWasteInput(value);
+									}}
+									placeholder="Enter amount in gold"
+									className="text-lg"
+								/>
+								{tempWasteInput && (
+									<div className="text-sm text-muted-foreground">
+										Current: {formatNumber(parseInt(tempWasteInput.replace(/,/g, "")) || 0)} gp
+									</div>
+								)}
+							</div>
+							<div className="flex gap-2">
+								<Button
+									variant="outline"
+									onClick={() => handleCalculateBless(openWasteModal)}
+									className="flex-1"
+								>
+									Calculate Bless
+								</Button>
+							</div>
+						</div>
+						<DialogFooter>
+							<Button variant="outline" onClick={handleCloseWasteModal}>
+								Cancel
+							</Button>
+							<Button onClick={() => handleSaveExtraWaste(openWasteModal)}>
+								Save
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			)}
 		</div>
 	);
 }
