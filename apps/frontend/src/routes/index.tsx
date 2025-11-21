@@ -6,8 +6,8 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
 	return (
-		<div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-100 via-white to-blue-50 px-4 py-12">
-			<h1 className="text-4xl font-extrabold mb-4 text-center text-blue-900 drop-shadow-md">
+		<div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-12">
+			<h1 className="text-4xl font-extrabold mb-4 text-center text-foreground drop-shadow-md">
 				Tibia Group Tools
 			</h1>
 			<p className="mb-10 text-lg text-muted-foreground max-w-xl text-center">
@@ -17,7 +17,7 @@ function LandingPage() {
 			<div className="flex flex-col sm:flex-row gap-6">
 				<Link
 					to="/loot-split"
-					className="inline-block rounded-xl px-8 py-4 text-lg font-semibold text-white bg-blue-700 hover:bg-blue-800 shadow transition-colors"
+					className="inline-block rounded-xl px-8 py-4 text-lg font-semibold text-primary-foreground bg-primary hover:opacity-90 shadow transition-opacity"
 				>
 					🪙 Loot Split Calculator
 				</Link>

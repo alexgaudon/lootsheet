@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ function RouteComponent() {
 		null,
 	);
 	const [error, setError] = useState<string | null>(null);
+	const [copiedTransfer, setCopiedTransfer] = useState<string | null>(null);
 
 	const handleParse = () => {
 		setError(null);
@@ -33,6 +35,18 @@ function RouteComponent() {
 
 	const formatNumber = (num: number): string => {
 		return num.toLocaleString("en-US");
+	};
+
+	const handleCopyTransfer = async (
+		transfer: { from: string; to: string; amount: number },
+		transferKey: string,
+	) => {
+		const text = `transfer ${transfer.amount} to ${transfer.to}`;
+		await navigator.clipboard.writeText(text);
+		setCopiedTransfer(transferKey);
+		setTimeout(() => {
+			setCopiedTransfer(null);
+		}, 2000);
 	};
 
 	return (
@@ -220,21 +234,41 @@ function RouteComponent() {
 									needed:
 								</p>
 								<div className="space-y-2">
-									{parsedSession.transfers.map((transfer) => (
-										<div
-											key={`${transfer.from}-${transfer.to}-${transfer.amount}`}
-											className="flex items-center justify-between p-3 bg-accent/50 rounded-md"
-										>
-											<div className="flex items-center gap-2">
-												<span className="font-semibold">{transfer.from}</span>
-												<span className="text-muted-foreground">→</span>
-												<span className="font-semibold">{transfer.to}</span>
+									{parsedSession.transfers.map((transfer) => {
+										const transferKey = `${transfer.from}-${transfer.to}-${transfer.amount}`;
+										const isCopied = copiedTransfer === transferKey;
+										return (
+											<div
+												key={transferKey}
+												className="flex items-center justify-between p-3 bg-accent/50 rounded-md"
+											>
+												<div className="flex items-center gap-2">
+													<span className="font-semibold">{transfer.from}</span>
+													<span className="text-muted-foreground">→</span>
+													<span className="font-semibold">{transfer.to}</span>
+												</div>
+												<div className="flex items-center gap-3">
+													<span className="font-semibold text-lg">
+														{formatNumber(transfer.amount)} gp
+													</span>
+													<Button
+														size="sm"
+														variant="outline"
+														onClick={() =>
+															handleCopyTransfer(transfer, transferKey)
+														}
+														className="p-2"
+													>
+														{isCopied ? (
+															<Check className="h-4 w-4" />
+														) : (
+															<Copy className="h-4 w-4" />
+														)}
+													</Button>
+												</div>
 											</div>
-											<span className="font-semibold text-lg">
-												{formatNumber(transfer.amount)} gp
-											</span>
-										</div>
-									))}
+										);
+									})}
 								</div>
 							</div>
 						)}
