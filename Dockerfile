@@ -31,13 +31,27 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates wget
 WORKDIR /root/
 
+# Build arguments for directory paths (defaults: /pb_data and /pb_public)
+ARG PB_DATA_DIR=/pb_data
+ARG PB_PUBLIC_DIR=/pb_public
+
+# Create the directories
+RUN mkdir -p "${PB_DATA_DIR}" "${PB_PUBLIC_DIR}"
+
 # Copy the executable from builder
 COPY --from=backend-builder /app/lootsheet .
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /root/docker-entrypoint.sh
+RUN chmod +x /root/docker-entrypoint.sh
 
 # Expose PocketBase default port
 EXPOSE 8090
 
-# Run the executable
-# Bind to 0.0.0.0 to accept connections from outside the container
-CMD ["./lootsheet", "serve", "--http=0.0.0.0:8090"]
+# Set default environment variables (can be overridden at runtime)
+ENV PB_DATA_DIR=${PB_DATA_DIR}
+ENV PB_PUBLIC_DIR=${PB_PUBLIC_DIR}
+
+# Use entrypoint script for flexible configuration
+ENTRYPOINT ["/root/docker-entrypoint.sh"]
 

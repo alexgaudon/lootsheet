@@ -5,15 +5,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Optional: Override default directories at build time
+      # args:
+      #   PB_DATA_DIR: /custom/path/pb_data
+      #   PB_PUBLIC_DIR: /custom/path/pb_public
     container_name: lootsheet
     ports:
       - "8090:8090"
     volumes:
       # Persist PocketBase data
-      - ./apps/backend/pb_data:/root/pb_data
+      - ./apps/backend/pb_data:/pb_data
     environment:
-      # Optional: Set PocketBase data directory
-      - PB_DATA_DIR=/root/pb_data
+      # Optional: Set PocketBase data and public directories
+      - PB_DATA_DIR=/pb_data
+      - PB_PUBLIC_DIR=/pb_public
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8090/api/health"]
