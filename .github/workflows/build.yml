@@ -1,0 +1,87 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.4'
+        
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+          
+    - name: Cache Bun dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.bun/install/cache
+          apps/frontend/node_modules
+        key: ${{ runner.os }}-bun-${{ hashFiles('apps/frontend/bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-
+          
+    - name: Install frontend dependencies
+      run: |
+        cd apps/frontend
+        bun install --frozen-lockfile
+        
+    - name: Build frontend
+      run: |
+        cd apps/frontend
+        bun run build
+        
+    - name: Download Go modules
+      run: |
+        cd apps/backend
+        go mod download
+        
+    - name: Build backend
+      run: |
+        cd apps/backend
+        mkdir -p pb_public
+        cp -r ../frontend/dist/* pb_public/
+        CGO_ENABLED=0 GOOS=linux go build -tags production -a -installsuffix cgo -o lootsheet .
+        
+    - name: Run frontend tests
+      run: |
+        cd apps/frontend
+        bun run test
+        
+    - name: Run frontend linting
+      run: |
+        cd apps/frontend
+        bun run lint
+        
+    - name: Run frontend type checking
+      run: |
+        cd apps/frontend
+        bun run check
+        
+    - name: Build Docker image
+      run: |
+        docker build -t lootsheet:${{ github.sha }} .
+        docker tag lootsheet:${{ github.sha }} lootsheet:latest
