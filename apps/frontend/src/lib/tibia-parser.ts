@@ -292,7 +292,10 @@ export interface BlessingCosts {
 	};
 }
 
-export function calculateBlessingCost(level: number): BlessingCosts {
+export function calculateBlessingCost(
+	level: number,
+	inqBless = true,
+): BlessingCosts {
 	if (level < 1) {
 		throw new Error("Level must be at least 1");
 	}
@@ -335,9 +338,9 @@ export function calculateBlessingCost(level: number): BlessingCosts {
 	};
 
 	const bloodOfTheMountain = (L: number): number => {
-		if (L <= 30) return 2000;
-		if (L < 120) return 200 * (L - 20);
-		return 20000 + 75 * (L - 120);
+		if (L <= 30) return 2600;
+		if (L < 120) return 260 * (L - 20);
+		return 26000 + 100 * (L - 120);
 	};
 
 	const twistOfFate = (L: number): number => {
@@ -347,11 +350,19 @@ export function calculateBlessingCost(level: number): BlessingCosts {
 	};
 
 	const individual = {
-		spiritualShielding: spiritualShielding(level),
-		fireOfTheSuns: fireOfTheSuns(level),
-		sparkOfThePhoenix: sparkOfThePhoenix(level),
-		embraceOfTibia: embraceOfTibia(level),
-		wisdomOfSolitude: wisdomOfSolitude(level),
+		spiritualShielding: inqBless
+			? spiritualShielding(level) * 1.1
+			: spiritualShielding(level),
+		fireOfTheSuns: inqBless ? fireOfTheSuns(level) * 1.1 : fireOfTheSuns(level),
+		sparkOfThePhoenix: inqBless
+			? sparkOfThePhoenix(level) * 1.1
+			: sparkOfThePhoenix(level),
+		embraceOfTibia: inqBless
+			? embraceOfTibia(level) * 1.1
+			: embraceOfTibia(level),
+		wisdomOfSolitude: inqBless
+			? wisdomOfSolitude(level) * 1.1
+			: wisdomOfSolitude(level),
 		heartOfTheMountain: heartOfTheMountain(level),
 		bloodOfTheMountain: bloodOfTheMountain(level),
 		twistOfFate: twistOfFate(level),

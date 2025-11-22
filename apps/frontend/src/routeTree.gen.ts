@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LootSplitRouteImport } from './routes/loot-split'
 import { Route as GroupsRouteImport } from './routes/groups'
+import { Route as BlessCalculatorRouteImport } from './routes/bless-calculator'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GroupsIndexRouteImport } from './routes/groups.index'
 import { Route as GroupsIdRouteImport } from './routes/groups.$id'
@@ -24,6 +25,11 @@ const LootSplitRoute = LootSplitRouteImport.update({
 const GroupsRoute = GroupsRouteImport.update({
   id: '/groups',
   path: '/groups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlessCalculatorRoute = BlessCalculatorRouteImport.update({
+  id: '/bless-calculator',
+  path: '/bless-calculator',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -49,6 +55,7 @@ const GroupsInviteTokenRoute = GroupsInviteTokenRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/bless-calculator': typeof BlessCalculatorRoute
   '/groups': typeof GroupsRouteWithChildren
   '/loot-split': typeof LootSplitRoute
   '/groups/$id': typeof GroupsIdRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/bless-calculator': typeof BlessCalculatorRoute
   '/loot-split': typeof LootSplitRoute
   '/groups/$id': typeof GroupsIdRoute
   '/groups': typeof GroupsIndexRoute
@@ -65,6 +73,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/bless-calculator': typeof BlessCalculatorRoute
   '/groups': typeof GroupsRouteWithChildren
   '/loot-split': typeof LootSplitRoute
   '/groups/$id': typeof GroupsIdRoute
@@ -75,16 +84,24 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/bless-calculator'
     | '/groups'
     | '/loot-split'
     | '/groups/$id'
     | '/groups/'
     | '/groups/invite/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/loot-split' | '/groups/$id' | '/groups' | '/groups/invite/$token'
+  to:
+    | '/'
+    | '/bless-calculator'
+    | '/loot-split'
+    | '/groups/$id'
+    | '/groups'
+    | '/groups/invite/$token'
   id:
     | '__root__'
     | '/'
+    | '/bless-calculator'
     | '/groups'
     | '/loot-split'
     | '/groups/$id'
@@ -94,6 +111,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BlessCalculatorRoute: typeof BlessCalculatorRoute
   GroupsRoute: typeof GroupsRouteWithChildren
   LootSplitRoute: typeof LootSplitRoute
 }
@@ -112,6 +130,13 @@ declare module '@tanstack/react-router' {
       path: '/groups'
       fullPath: '/groups'
       preLoaderRoute: typeof GroupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bless-calculator': {
+      id: '/bless-calculator'
+      path: '/bless-calculator'
+      fullPath: '/bless-calculator'
+      preLoaderRoute: typeof BlessCalculatorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -162,6 +187,7 @@ const GroupsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BlessCalculatorRoute: BlessCalculatorRoute,
   GroupsRoute: GroupsRouteWithChildren,
   LootSplitRoute: LootSplitRoute,
 }

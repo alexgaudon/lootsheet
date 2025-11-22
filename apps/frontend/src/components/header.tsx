@@ -19,6 +19,10 @@ export const NAV_LINKS: NavLink[] = [
 		label: "Loot Split",
 		to: "/loot-split",
 	},
+	{
+		label: "Blessing Calculator",
+		to: "/bless-calculator",
+	},
 	{ label: "Groups", to: "/groups", requiresAuth: true },
 ];
 
