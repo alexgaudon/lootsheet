@@ -13,8 +13,10 @@ import {
 	Copy,
 	Merge,
 	Trash2,
+	Upload,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LootSplitImporter } from "@/components/loot-split-importer";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -24,6 +26,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import pb, { useAuth } from "@/lib/pb";
 import type {
 	CollectionResponses,
@@ -31,6 +39,7 @@ import type {
 	TransfersResponse,
 	UsersResponse,
 } from "@/lib/pocketbase-types";
+import type { ParsedSession } from "@/lib/tibia-parser";
 
 export const Route = createFileRoute("/groups/$id")({
 	component: RouteComponent,
@@ -53,6 +62,15 @@ function RouteComponent() {
 	const [copied, setCopied] = useState(false);
 	const [showCompletedTransfers, setShowCompletedTransfers] = useState(false);
 	const [copiedTransferId, setCopiedTransferId] = useState<string | null>(null);
+	const [isQuickImportOpen, setIsQuickImportOpen] = useState(false);
+	const [importSaveSuccess, setImportSaveSuccess] = useState<number | null>(
+		null,
+	);
+	const [quickImportTransfers, setQuickImportTransfers] = useState<
+		ParsedSession["transfers"]
+	>([]);
+	const [isSavingQuickImport, setIsSavingQuickImport] = useState(false);
+	const [quickImportError, setQuickImportError] = useState<string | null>(null);
 
 	// Fetch group with expanded transfers
 	const {
@@ -185,7 +203,7 @@ function RouteComponent() {
 			status,
 		}: {
 			transferId: string;
-			status: "pending" | "sent" | "complete";
+			status: "pending" | "complete";
 		}) => {
 			await pb.collection("transfers").update(transferId, { status });
 		},
@@ -439,24 +457,90 @@ function RouteComponent() {
 							<h2 className="text-2xl font-semibold">
 								Transfers ({transfers?.length || 0})
 							</h2>
+							{isMember && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setIsQuickImportOpen(true)}
+								>
+									<Upload className="h-4 w-4 mr-2" />
+									Quick Import Session
+								</Button>
+							)}
 						</div>
 						{transfers.length === 0 ? (
 							<p className="text-muted-foreground">
 								No transfers yet. Save a loot split session to create transfers.
 							</p>
 						) : (
-							<>
+							<TooltipProvider>
 								{(() => {
 									const formatNumber = (num: number): string => {
 										return num.toLocaleString("en-US");
+									};
+
+									const formatRelativeTime = (date: string): string => {
+										const now = new Date();
+										const transferDate = new Date(date);
+										const diffInSeconds = Math.floor(
+											(now.getTime() - transferDate.getTime()) / 1000,
+										);
+
+										if (diffInSeconds < 60) {
+											return "right now";
+										}
+
+										const diffInMinutes = Math.floor(diffInSeconds / 60);
+										if (diffInMinutes < 60) {
+											return `${diffInMinutes} minute${diffInMinutes !== 1 ? "s" : ""} ago`;
+										}
+
+										const diffInHours = Math.floor(diffInMinutes / 60);
+										if (diffInHours < 24) {
+											return `${diffInHours} hour${diffInHours !== 1 ? "s" : ""} ago`;
+										}
+
+										const diffInDays = Math.floor(diffInHours / 24);
+										if (diffInDays === 1) {
+											return "yesterday";
+										}
+										if (diffInDays < 7) {
+											return `${diffInDays} days ago`;
+										}
+										if (diffInDays < 14) {
+											return "last week";
+										}
+										if (diffInDays < 30) {
+											const weeks = Math.floor(diffInDays / 7);
+											return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
+										}
+										if (diffInDays < 365) {
+											const months = Math.floor(diffInDays / 30);
+											return `${months} month${months !== 1 ? "s" : ""} ago`;
+										}
+
+										const years = Math.floor(diffInDays / 365);
+										return `${years} year${years !== 1 ? "s" : ""} ago`;
+									};
+
+									const formatFullDateTime = (date: string): string => {
+										const d = new Date(date);
+										const dateStr = d.toLocaleDateString(undefined, {
+											month: "short",
+											day: "numeric",
+											year: "numeric",
+										});
+										const timeStr = d.toLocaleTimeString(undefined, {
+											hour: "2-digit",
+											minute: "2-digit",
+										});
+										return `${dateStr} • ${timeStr}`;
 									};
 
 									const getStatusColor = (status: string) => {
 										switch (status) {
 											case "complete":
 												return "bg-green-500/10 text-green-600 dark:text-green-400";
-											case "sent":
-												return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
 											default:
 												return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400";
 										}
@@ -495,75 +579,93 @@ function RouteComponent() {
 										return (
 											<div
 												key={transfer.id}
-												className="flex items-center justify-between p-3 rounded-md bg-accent/50"
+												className="group relative flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-accent/30 transition-colors shadow-sm hover:shadow-md"
 											>
-												<div className="flex items-center gap-3 flex-1">
-													<div className="flex items-center gap-2">
-														<span className="font-semibold">
-															{transfer.from}
-														</span>
-														<span className="text-muted-foreground">→</span>
-														<span className="font-semibold">{transfer.to}</span>
+												{/* Status indicator bar */}
+												<div
+													className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${
+														transfer.status === "complete"
+															? "bg-green-500"
+															: "bg-yellow-500"
+													}`}
+												/>
+
+												{/* Main content */}
+												<div className="flex-1 min-w-0">
+													<div className="flex items-start justify-between gap-4 mb-2">
+														<div className="flex-1 min-w-0">
+															<div className="flex items-center gap-2 mb-1.5">
+																<span className="font-semibold text-base truncate">
+																	{transfer.from}
+																</span>
+																<span className="text-muted-foreground shrink-0">
+																	→
+																</span>
+																<span className="font-semibold text-base truncate">
+																	{transfer.to}
+																</span>
+															</div>
+															{transfer.created && (
+																<Tooltip>
+																	<TooltipTrigger asChild>
+																		<span className="text-xs text-muted-foreground/80 cursor-help hover:text-muted-foreground transition-colors">
+																			{formatRelativeTime(transfer.created)}
+																		</span>
+																	</TooltipTrigger>
+																	<TooltipContent>
+																		<p>
+																			{formatFullDateTime(transfer.created)}
+																		</p>
+																	</TooltipContent>
+																</Tooltip>
+															)}
+														</div>
+														<div className="flex flex-col items-end gap-2 shrink-0">
+															<span className="font-bold text-xl text-foreground">
+																{formatNumber(transfer.amount || 0)} gp
+															</span>
+															<span
+																className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize ${getStatusColor(
+																	transfer.status || "pending",
+																)}`}
+															>
+																{transfer.status || "pending"}
+															</span>
+														</div>
 													</div>
-													<span className="font-semibold text-lg">
-														{formatNumber(transfer.amount || 0)} gp
-													</span>
 												</div>
-												<div className="flex items-center gap-2">
-													<span
-														className={`text-xs px-2 py-1 rounded capitalize ${getStatusColor(
-															transfer.status || "pending",
-														)}`}
-													>
-														{transfer.status || "pending"}
-													</span>
+
+												{/* Action buttons */}
+												<div className="flex items-center gap-2 shrink-0">
 													<Button
 														size="sm"
-														variant="outline"
+														variant="ghost"
 														onClick={() => handleCopyTransfer(transfer)}
-														className="p-2"
+														className="h-8 w-8 p-0"
+														title="Copy transfer command"
 													>
 														{isCopied ? (
-															<Check className="h-4 w-4" />
+															<Check className="h-4 w-4 text-green-600 dark:text-green-400" />
 														) : (
 															<Copy className="h-4 w-4" />
 														)}
 													</Button>
-													{isMember &&
-														transfer.status !== "complete" &&
-														(transfer.status === "pending" ? (
-															<Button
-																size="sm"
-																variant="outline"
-																onClick={() =>
-																	updateTransferStatusMutation.mutate({
-																		transferId: transfer.id,
-																		status: "sent",
-																	})
-																}
-																disabled={
-																	updateTransferStatusMutation.isPending
-																}
-															>
-																Mark as Sent
-															</Button>
-														) : (
-															<Button
-																size="sm"
-																variant="outline"
-																onClick={() =>
-																	updateTransferStatusMutation.mutate({
-																		transferId: transfer.id,
-																		status: "complete",
-																	})
-																}
-																disabled={
-																	updateTransferStatusMutation.isPending
-																}
-															>
-																Mark as Complete
-															</Button>
-														))}
+													{isMember && transfer.status !== "complete" && (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																updateTransferStatusMutation.mutate({
+																	transferId: transfer.id,
+																	status: "complete",
+																})
+															}
+															disabled={updateTransferStatusMutation.isPending}
+															className="text-xs"
+														>
+															Mark as Complete
+														</Button>
+													)}
 												</div>
 											</div>
 										);
@@ -669,7 +771,7 @@ function RouteComponent() {
 										</div>
 									);
 								})()}
-							</>
+							</TooltipProvider>
 						)}
 					</div>
 				</div>
@@ -747,6 +849,128 @@ function RouteComponent() {
 							disabled={deleteGroupMutation.isPending}
 						>
 							{deleteGroupMutation.isPending ? "Deleting..." : "Delete"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Quick Import Session Dialog */}
+			<Dialog open={isQuickImportOpen} onOpenChange={setIsQuickImportOpen}>
+				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Quick Import Session</DialogTitle>
+						<DialogDescription>
+							Paste your Tibia session data below. Click Save to add transfers
+							to this group.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="py-4">
+						<LootSplitImporter
+							groupId={id}
+							groupName={group.name}
+							autoSave={false}
+							showSaveButton={false}
+							onTransfersChange={(transfers) => {
+								setQuickImportTransfers(transfers);
+							}}
+						/>
+					</div>
+					{quickImportError && (
+						<div className="py-2">
+							<div className="text-destructive text-sm bg-destructive/10 border border-destructive/20 rounded-md p-3">
+								{quickImportError}
+							</div>
+						</div>
+					)}
+					{importSaveSuccess !== null && (
+						<div className="py-2">
+							<div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-500/10 border border-green-500/20 rounded-md p-3">
+								<Check className="h-4 w-4" />
+								<span>
+									Successfully saved {importSaveSuccess} transfer
+									{importSaveSuccess !== 1 ? "s" : ""} to {group.name}!
+								</span>
+							</div>
+						</div>
+					)}
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => {
+								setIsQuickImportOpen(false);
+								setImportSaveSuccess(null);
+								setQuickImportTransfers([]);
+								setQuickImportError(null);
+							}}
+							disabled={isSavingQuickImport}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={async () => {
+								if (quickImportTransfers.length === 0) return;
+
+								setIsSavingQuickImport(true);
+								setQuickImportError(null);
+
+								try {
+									// Create all transfers sequentially
+									const createdTransfers = [];
+									for (const transfer of quickImportTransfers) {
+										try {
+											const created = await pb
+												.collection("transfers")
+												.create<CollectionResponses["transfers"]>(
+													{
+														group: id,
+														from: transfer.from,
+														to: transfer.to,
+														amount: transfer.amount,
+														status: "pending",
+													},
+													{ requestKey: null },
+												);
+											createdTransfers.push(created);
+										} catch (err) {
+											console.error("Failed to create transfer:", err);
+											if (
+												err instanceof Error &&
+												!err.message.includes("autocancelled")
+											) {
+												throw err;
+											}
+										}
+									}
+
+									setImportSaveSuccess(createdTransfers.length);
+									// Refetch transfers after a short delay
+									setTimeout(() => {
+										refetch();
+									}, 500);
+									// Close the modal immediately after successful save
+									setTimeout(() => {
+										setIsQuickImportOpen(false);
+										setImportSaveSuccess(null);
+										setQuickImportTransfers([]);
+										setQuickImportError(null);
+									}, 1500);
+								} catch (err) {
+									setQuickImportError(
+										err instanceof Error
+											? err.message
+											: "Failed to save transfers. Please try again.",
+									);
+								} finally {
+									setIsSavingQuickImport(false);
+								}
+							}}
+							disabled={
+								isSavingQuickImport ||
+								quickImportTransfers.length === 0 ||
+								importSaveSuccess !== null
+							}
+						>
+							{isSavingQuickImport ? "Saving..." : "Save"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
