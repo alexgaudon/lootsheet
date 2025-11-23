@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { ErrorMessage } from "@/components/ui";
+import { PageContainer } from "@/components/ui/page-container";
 import { calculateBlessingCost } from "@/lib/tibia-parser";
 
 export const Route = createFileRoute("/bless-calculator")({
@@ -39,8 +41,7 @@ function RouteComponent() {
 	};
 
 	return (
-		<div className="container mx-auto max-w-6xl px-4 py-8">
-			<h1 className="text-3xl font-bold mb-6">Blessings Calculator</h1>
+		<PageContainer title="Blessings Calculator">
 			<div className="mb-6 flex flex-col gap-4 max-w-sm mx-auto">
 				<label className="font-medium">
 					Character Level
@@ -89,9 +90,7 @@ function RouteComponent() {
 				</label>
 			</div>
 			{error && (
-				<div className="text-red-600 font-medium mb-4 flex justify-center">
-					{error}
-				</div>
+				<ErrorMessage message={error} className="mb-4 justify-center" />
 			)}
 			{result && (
 				<div className="bg-accent p-4 rounded shadow space-y-2 max-w-md mx-auto">
@@ -128,6 +127,6 @@ function RouteComponent() {
 					</details>
 				</div>
 			)}
-		</div>
+		</PageContainer>
 	);
 }

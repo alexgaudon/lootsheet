@@ -1,12 +1,13 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useState } from "react";
 import { DiscordButton } from "@/components/auth/discord-button";
 import { UserAvatar } from "@/components/auth/user-avatar";
+import { MobileMenu } from "@/components/mobile-menu";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/pb";
 import type { CollectionResponses } from "@/lib/pocketbase-types";
-import { cn, formatDiscordName } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export type NavLink = {
 	label: string;
@@ -29,13 +30,11 @@ export const NAV_LINKS: NavLink[] = [
 function getDisplayName(record: CollectionResponses["users"] | null): string {
 	if (!record) return "";
 
-	// Prefer name field if available, but clean discriminator
-	if (record.name) return formatDiscordName(record.name);
+	// Prefer name field if available
+	if (record.name) return record.name;
 
-	// Clean username by removing Discord discriminator (e.g., "amgau#0" -> "amgau")
-	if (record.username) {
-		return formatDiscordName(record.username);
-	}
+	// Fall back to username
+	if (record.username) return record.username;
 
 	// Fall back to default
 	return "User";
@@ -92,23 +91,22 @@ export function Header() {
 					)}
 				</div>
 				<div className="flex items-center gap-2 sm:gap-4">
-					{/* Desktop User Info */}
+					{/* User Info */}
 					{isSignedIn && (
-						<div className="hidden lg:flex items-center gap-3">
-							<span className="text-sm text-muted-foreground">
-								Welcome back,{" "}
-								<span className="font-medium text-foreground">
-									{displayName}
+						<>
+							<div className="hidden lg:flex items-center gap-3">
+								<span className="text-sm text-muted-foreground">
+									Welcome back,{" "}
+									<span className="font-medium text-foreground">
+										{displayName}
+									</span>
 								</span>
-							</span>
-							<UserAvatar />
-						</div>
-					)}
-					{/* Mobile/Tablet: Show avatar only */}
-					{isSignedIn && (
-						<div className="lg:hidden">
-							<UserAvatar />
-						</div>
+								<UserAvatar />
+							</div>
+							<div className="lg:hidden">
+								<UserAvatar />
+							</div>
+						</>
 					)}
 					<DiscordButton />
 					{/* Mobile Menu Button */}
@@ -121,51 +119,19 @@ export function Header() {
 							aria-label="Toggle menu"
 							aria-expanded={isMobileMenuOpen}
 						>
-							{isMobileMenuOpen ? (
-								<X className="h-5 w-5" />
-							) : (
-								<Menu className="h-5 w-5" />
-							)}
+							<Menu className="h-5 w-5" />
 						</Button>
 					)}
 				</div>
 			</div>
 
-			{/* Mobile Menu */}
-			{isMobileMenuOpen && visibleNavLinks.length > 0 && (
-				<div className="md:hidden border-t bg-background animate-in slide-in-from-top duration-200">
-					<nav className="flex flex-col px-4 py-3 space-y-1">
-						{visibleNavLinks.map((link) => {
-							const isActive = location.pathname === link.to;
-							return (
-								<Link
-									key={link.to}
-									to={link.to}
-									onClick={() => setIsMobileMenuOpen(false)}
-									className={cn(
-										"px-3 py-2 text-sm font-medium transition-colors rounded-md",
-										isActive
-											? "text-foreground bg-accent"
-											: "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-									)}
-								>
-									{link.label}
-								</Link>
-							);
-						})}
-						{isSignedIn && (
-							<div className="px-3 py-2 mt-2 pt-3 border-t">
-								<div className="text-sm text-muted-foreground">
-									Welcome back,{" "}
-									<span className="font-medium text-foreground">
-										{displayName}
-									</span>
-								</div>
-							</div>
-						)}
-					</nav>
-				</div>
-			)}
+			<MobileMenu
+				isOpen={isMobileMenuOpen && visibleNavLinks.length > 0}
+				onClose={() => setIsMobileMenuOpen(false)}
+				links={visibleNavLinks}
+				isSignedIn={isSignedIn}
+				displayName={userRecord?.name || userRecord?.username || "User"}
+			/>
 		</header>
 	);
 }

@@ -1,6 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -12,64 +11,22 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import pb, { useAuth } from "@/lib/pb";
-import type {
-	CollectionResponses,
-	GroupsResponse,
-	UsersResponse,
-} from "@/lib/pocketbase-types";
+import { PageContainer } from "@/components/ui/page-container";
+import { useCreateGroup, useGroups } from "@/hooks/use-groups";
+import { useAuth } from "@/lib/pb";
 
 export const Route = createFileRoute("/groups/")({
 	component: RouteComponent,
 });
 
-type GroupWithExpand = GroupsResponse<{
-	owner?: UsersResponse;
-	members?: UsersResponse[];
-}>;
-
 function RouteComponent() {
 	const auth = useAuth();
-	const queryClient = useQueryClient();
+	const groupNameInputId = useId();
 	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 	const [newGroupName, setNewGroupName] = useState("");
 
-	// Fetch groups
-	const { data: groups = [], isLoading } = useQuery<GroupWithExpand[]>({
-		queryKey: ["groups"],
-		queryFn: async () => {
-			const records = await pb
-				.collection("groups")
-				.getFullList<GroupWithExpand>({
-					sort: "-created",
-					expand: "owner,members",
-				});
-			return records;
-		},
-		enabled: auth.isAuthenticated,
-	});
-
-	// Create group mutation
-	const createGroupMutation = useMutation({
-		mutationFn: async (name: string) => {
-			if (!auth.record?.id) {
-				throw new Error("You must be logged in to create a group");
-			}
-			const record = await pb
-				.collection("groups")
-				.create<CollectionResponses["groups"]>({
-					name,
-					owner: auth.record.id,
-					members: [auth.record.id], // Add owner as a member
-				});
-			return record;
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["groups"] });
-			setIsCreateDialogOpen(false);
-			setNewGroupName("");
-		},
-	});
+	const { data: groups = [], isLoading } = useGroups();
+	const createGroupMutation = useCreateGroup();
 
 	const handleCreateGroup = () => {
 		if (!newGroupName.trim()) {
@@ -80,25 +37,25 @@ function RouteComponent() {
 
 	if (!auth.isAuthenticated) {
 		return (
-			<div className="container mx-auto max-w-6xl px-4 py-8">
+			<PageContainer>
 				<div className="text-center py-12">
 					<p className="text-lg text-muted-foreground">
 						Please log in to view and create groups.
 					</p>
 				</div>
-			</div>
+			</PageContainer>
 		);
 	}
 
 	return (
-		<div className="container mx-auto max-w-6xl px-4 py-8">
-			<div className="flex items-center justify-between mb-6">
-				<h1 className="text-3xl font-bold">Groups</h1>
+		<PageContainer
+			title="Groups"
+			actions={
 				<Button onClick={() => setIsCreateDialogOpen(true)}>
 					Create a Group
 				</Button>
-			</div>
-
+			}
+		>
 			{isLoading ? (
 				<div className="text-muted-foreground">Loading groups...</div>
 			) : groups.length === 0 ? (
@@ -156,7 +113,13 @@ function RouteComponent() {
 				</div>
 			)}
 
-			<Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+			<Dialog
+				open={isCreateDialogOpen}
+				onOpenChange={(open) => {
+					setIsCreateDialogOpen(open);
+					if (!open) setNewGroupName("");
+				}}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Create a Group</DialogTitle>
@@ -166,9 +129,9 @@ function RouteComponent() {
 					</DialogHeader>
 					<div className="space-y-4 py-4">
 						<div className="space-y-2">
-							<Label htmlFor="group-name">Group Name</Label>
+							<Label htmlFor={groupNameInputId}>Group Name</Label>
 							<Input
-								id="group-name"
+								id={groupNameInputId}
 								placeholder="My Group"
 								value={newGroupName}
 								onChange={(e) => setNewGroupName(e.target.value)}
@@ -197,6 +160,6 @@ function RouteComponent() {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
-		</div>
+		</PageContainer>
 	);
 }

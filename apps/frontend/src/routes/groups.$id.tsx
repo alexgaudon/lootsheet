@@ -40,6 +40,7 @@ import type {
 	UsersResponse,
 } from "@/lib/pocketbase-types";
 import type { ParsedSession } from "@/lib/tibia-parser";
+import { formatRelativeTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/groups/$id")({
 	component: RouteComponent,
@@ -477,50 +478,6 @@ function RouteComponent() {
 								{(() => {
 									const formatNumber = (num: number): string => {
 										return num.toLocaleString("en-US");
-									};
-
-									const formatRelativeTime = (date: string): string => {
-										const now = new Date();
-										const transferDate = new Date(date);
-										const diffInSeconds = Math.floor(
-											(now.getTime() - transferDate.getTime()) / 1000,
-										);
-
-										if (diffInSeconds < 60) {
-											return "right now";
-										}
-
-										const diffInMinutes = Math.floor(diffInSeconds / 60);
-										if (diffInMinutes < 60) {
-											return `${diffInMinutes} minute${diffInMinutes !== 1 ? "s" : ""} ago`;
-										}
-
-										const diffInHours = Math.floor(diffInMinutes / 60);
-										if (diffInHours < 24) {
-											return `${diffInHours} hour${diffInHours !== 1 ? "s" : ""} ago`;
-										}
-
-										const diffInDays = Math.floor(diffInHours / 24);
-										if (diffInDays === 1) {
-											return "yesterday";
-										}
-										if (diffInDays < 7) {
-											return `${diffInDays} days ago`;
-										}
-										if (diffInDays < 14) {
-											return "last week";
-										}
-										if (diffInDays < 30) {
-											const weeks = Math.floor(diffInDays / 7);
-											return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
-										}
-										if (diffInDays < 365) {
-											const months = Math.floor(diffInDays / 30);
-											return `${months} month${months !== 1 ? "s" : ""} ago`;
-										}
-
-										const years = Math.floor(diffInDays / 365);
-										return `${years} year${years !== 1 ? "s" : ""} ago`;
 									};
 
 									const formatFullDateTime = (date: string): string => {

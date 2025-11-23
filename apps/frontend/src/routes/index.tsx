@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PageContainer } from "@/components/ui/page-container";
 
 export const Route = createFileRoute("/")({
 	component: LandingPage,
@@ -6,7 +7,7 @@ export const Route = createFileRoute("/")({
 
 function LandingPage() {
 	return (
-		<div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-12">
+		<PageContainer className="min-h-screen flex flex-col items-center justify-center">
 			<h1 className="text-4xl font-extrabold mb-4 text-center text-foreground drop-shadow-md">
 				Tibia Group Tools
 			</h1>
@@ -34,6 +35,6 @@ function LandingPage() {
 				&copy; {new Date().getFullYear()} LootSheet &mdash; Not affiliated with
 				CipSoft or Tibia.com
 			</footer>
-		</div>
+		</PageContainer>
 	);
 }

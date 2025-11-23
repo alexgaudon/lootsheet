@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 
 	"github.com/pocketbase/pocketbase"
@@ -74,15 +75,7 @@ func main() {
 		}
 
 		members := group.GetStringSlice("members")
-		isMember := false
-		for _, member := range members {
-			if member == userId {
-				isMember = true
-				break
-			}
-		}
-
-		if !isMember {
+		if !slices.Contains(members, userId) {
 			members = append(members, userId)
 			group.Set("members", members)
 
