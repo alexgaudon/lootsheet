@@ -22,6 +22,12 @@ function LandingPage() {
 					🪙 Loot Split Calculator
 				</Link>
 				{/* Add more tools here as the app grows */}
+				<Link
+					to="/bless-calculator"
+					className="inline-block rounded-xl px-8 py-4 text-lg font-semibold text-primary-foreground bg-primary hover:opacity-90 shadow transition-opacity"
+				>
+					🙏 Blessing Calculator
+				</Link>
 			</div>
 
 			<footer className="mt-16 text-xs text-muted-foreground text-center opacity-80">
